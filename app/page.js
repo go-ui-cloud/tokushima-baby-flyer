@@ -97,7 +97,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.18</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.18.1</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
     </header>
 
@@ -110,7 +110,7 @@ export default function Home(){
 
     {message&&<p className="notice">ℹ️ {message}</p>}
     {progress&&<div className="progressPanel"><div className="progressTop"><div className="progressStore"><span>{STORE_ICONS[progress.storeId]||'🏪'}</span><strong>{progress.store}</strong></div><span>{progress.index}/{progress.total} ・ {elapsed}秒</span></div><div className="progressTrack"><div className="progressBar" style={{width:`${Math.max(6,(progress.index-1)/progress.total*100)}%`}}/></div><div className="progressPhase"><span className="phaseIcon">{PHASE_ICONS[progress.phase]||'•'}</span><strong>{progress.phase}</strong>{progress.detail&&<span>{progress.detail}</span>}</div><div className="progressActions"><button type="button" onClick={skipCurrent}>⏭ この店舗をスキップ</button></div><small>通常は1店舗120秒。文字量・ページ数が多い場合のみ最大300秒（5分）まで自動延長します。</small></div>}
-    {!data.persistence?.database&&<p className="warning">⚠️ DATABASE_URL が未設定です。Vercel本番ではNeonを接続してください。</p>}
+    {!data.persistence?.database&&<p className="warning">⚠️ Neon/Postgres の接続情報を確認できません。既存のVercel Storage連携またはEnvironment Variablesを確認してください。</p>}
 
     <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())}/></section>
 
