@@ -1,8 +1,8 @@
-# 徳島 ベビー用品チラシチェッカー ver 2.17
+# 徳島 ベビー用品チラシチェッカー ver 2.18
 
 GitHub → Vercel 配備用のNext.jsアプリです。指定された各社の公式URLのみを使い、チラシ/公式オンライン商品を取得・OCR・抽出します。Shufoo!検索は使用しません。
 
-## V2.17の変更
+## V2.18の変更
 
 - Private Vercel Blob の読み出しを `get(url, { access: 'private' })` に修正しました。
 - 「チラシ」ボタンからPDF・PNG・JPEGをインライン表示できるよう、BlobのContent-Typeを保持して返します。
@@ -66,4 +66,4 @@ GitHub → Vercel 配備用のNext.jsアプリです。指定された各社の�
 
 ## デプロイ
 
-GitHubリポジトリの中身をV2.17で上書きしてCommit/Pushしてください。VercelのGit連携が有効なら自動再デプロイされます。
+GitHubリポジトリの中身をV2.18で上書きしてCommit/Pushしてください。VercelのGit連携が有効なら自動再デプロイされます。
