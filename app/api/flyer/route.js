@@ -15,7 +15,7 @@ export async function GET(req){
       return Response.json({error:'許可されていないBlob URLです'},{status:400});
     }
 
-    const result=await get(url,{access:'private'});
+    const result=await get(url);
     if(!result || result.statusCode===404){
       return Response.json({error:'チラシが見つかりません'},{status:404});
     }
@@ -23,9 +23,11 @@ export async function GET(req){
       return Response.json({error:`Blob取得エラー (${result.statusCode})`},{status:result.statusCode});
     }
 
-    const {stream,blob}=result;
+    const stream=result.stream||result.body;
+    const blob=result.blob||result;
+    if(!stream) return Response.json({error:'Blobのストリームを取得できませんでした'},{status:502});
     const headers=new Headers();
-    headers.set('Content-Type',blob?.contentType||'application/octet-stream');
+    headers.set('Content-Type',blob?.contentType||result.headers?.get?.('content-type')||'image/png');
     headers.set('Cache-Control','private, no-store, max-age=0');
     headers.set('Content-Disposition','inline');
     return new Response(stream,{status:200,headers});
