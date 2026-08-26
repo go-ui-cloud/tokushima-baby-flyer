@@ -92,7 +92,7 @@ export default function Home() {
               </div>
               <div className="sourceLinks">
                 <a href={store.sourceUrl} target="_blank" rel="noreferrer">情報元</a>
-                {(store.flyers || []).slice(0, 6).map((f, i) => <a key={`${f.url}-${i}`} href={f.savedUrl || f.url} target="_blank" rel="noreferrer">チラシ{(store.flyers || []).length > 1 ? i + 1 : ''}</a>)}
+                {(store.flyers || []).slice(0, 6).map((f, i) => <a key={`${f.url}-${i}`} href={f.viewerUrl || f.url} target="_blank" rel="noreferrer">チラシ{(store.flyers || []).length > 1 ? i + 1 : ''}</a>)}
               </div>
             </div>
             {store.error && <p className="error">取得エラー: {store.error}</p>}
