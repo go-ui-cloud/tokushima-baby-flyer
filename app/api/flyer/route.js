@@ -26,7 +26,7 @@ export async function GET(req){
     const {stream,blob}=result;
     const headers=new Headers();
     headers.set('Content-Type',blob?.contentType||'application/octet-stream');
-    headers.set('Cache-Control','private, max-age=300');
+    headers.set('Cache-Control','private, no-store, max-age=0');
     headers.set('Content-Disposition','inline');
     return new Response(stream,{status:200,headers});
   }catch(e){
