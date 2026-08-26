@@ -109,9 +109,9 @@ CHROME_EXECUTABLE_PATH=/path/to/chrome
 - VercelプランによりFunctionの最大実行時間は異なります。v2では1店舗=1 Functionに分割しています。
 
 
-## V2.4 の変更点
+## V2.5 の変更点
 
-- 画面タイトル横に `ver 2.4` を表示。
+- 画面タイトル横に `ver 2.5` を表示。
 - Next.js 16 の本番ビルドを Webpack に固定し、ネイティブ依存関係の扱いを安定化。
 - `outputFileTracingIncludes` で `@sparticuz/chromium/bin/**` を `/api/update` Function に明示同梱。
 - Chromium の `bin` がプロジェクト配下に存在する場合は、そのパスを `chromium.executablePath()` に明示指定。
@@ -123,5 +123,9 @@ CHROME_EXECUTABLE_PATH=/path/to/chrome
 `@sparticuz/chromium` の現行系に合わせ、Node.js 22.17 以上を指定しています。GitHubへ更新後、Vercelは `package.json` の build script (`next build --webpack`) を使って再ビルドします。
 
 
-## V2.4 抽出方針
+## V2.5 抽出方針
 ベビー服は対象外です。通常の商品一覧・FAQ等は除外し、明確な販促表現と価格/割引情報が確認できる候補のみ表示します。
+
+
+## V2.5 店舗固定取得
+対象店舗は9店舗に固定しています。公式店舗ページを最優先し、公式側から実チラシ画像/PDFを取得できない場合のみ、設定済みのShufoo!同一店舗ページを試します。店舗名または住所が一致しないページは解析対象から除外します。
