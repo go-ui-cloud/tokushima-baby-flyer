@@ -1,8 +1,8 @@
 import './style.css';
 
 export const metadata = {
-  title: '徳島 ベビー用品セールチェッカー ver 2.3',
-  description: '徳島周辺の最新チラシ・公開クーポンからベビー用品のセール情報を抽出',
+  title: '徳島 ベビー用品チラシチェッカー ver 2.8',
+  description: '徳島周辺の最新チラシから対象カテゴリのベビー用品を抽出',
 };
 
 export default function RootLayout({ children }) {
