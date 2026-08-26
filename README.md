@@ -107,3 +107,17 @@ CHROME_EXECUTABLE_PATH=/path/to/chrome
 - `/tmp` は解析中の一時保存専用です。永続保存はDB/Blobを使用します。
 - OCRは誤認識する可能性があるため、画面には情報元・チラシへのリンクを表示します。
 - VercelプランによりFunctionの最大実行時間は異なります。v2では1店舗=1 Functionに分割しています。
+
+
+## V2.2 の変更点
+
+- 画面タイトル横に `ver 2.2` を表示。
+- Next.js 16 の本番ビルドを Webpack に固定し、ネイティブ依存関係の扱いを安定化。
+- `outputFileTracingIncludes` で `@sparticuz/chromium/bin/**` を `/api/update` Function に明示同梱。
+- Chromium の `bin` がプロジェクト配下に存在する場合は、そのパスを `chromium.executablePath()` に明示指定。
+- Chromium 起動に失敗した場合は、Cheerio + fetch のHTTPフォールバックでHTML・画像・PDFリンクの探索を継続。
+- HTTPフォールバックでも取得不能な場合のみ店舗エラーとして保存。推測値は生成しません。
+
+### Vercel Runtime
+
+`@sparticuz/chromium` の現行系に合わせ、Node.js 22.17 以上を指定しています。GitHubへ更新後、Vercelは `package.json` の build script (`next build --webpack`) を使って再ビルドします。

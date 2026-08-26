@@ -58,7 +58,7 @@ export default function Home() {
       <header className="topbar">
         <div>
           <p className="eyebrow">TOKUSHIMA BABY SALE</p>
-          <h1>ベビー用品 セールチェッカー</h1>
+          <div className="mainTitleRow"><h1>ベビー用品 セールチェッカー</h1><span className="versionBadge">ver 2.2</span></div>
           <p className="sub">最新チラシ・公開WEBクーポンから、ベビー用品だけを抽出します。</p>
         </div>
         <div className="actions">
