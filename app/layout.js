@@ -1,7 +1,7 @@
 import './style.css';
 
 export const metadata = {
-  title: '徳島 ベビー用品チラシチェッカー ver 2.8',
+  title: '徳島 ベビー用品チラシチェッカー ver 2.12',
   description: '徳島周辺の最新チラシから対象カテゴリのベビー用品を抽出',
 };
 
