@@ -13,7 +13,7 @@ export async function POST(req){
       return NextResponse.json(await finalizeHistory(body.batchId||null,body.snapshot||null),{headers:{'Cache-Control':'no-store'}});
     }
     if(!body.storeId) return NextResponse.json({error:'storeId が必要です'},{status:400});
-    const result=await updateStore(body.storeId);
+    const result=await updateStore(body.storeId,body.batchId||null);
     const latest=await getLatest();
     return NextResponse.json({ok:true,result,persistence:latest.persistence},{headers:{'Cache-Control':'no-store'}});
   }catch(e){return NextResponse.json({error:e.message},{status:500});}
