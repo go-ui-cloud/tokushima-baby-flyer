@@ -18,6 +18,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [category, setCategory] = useState('すべて');
+  const [progress, setProgress] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
 
   async function load() {
     const res = await fetch('/api/latest', { cache: 'no-store' });
@@ -31,22 +33,46 @@ export default function Home() {
     const batchId=globalThis.crypto?.randomUUID?.() || `${Date.now()}`;
     try {
       let snapshot={...data,results:[...(data.results||[])]};
+      let failed=0;
+      const names={
+        'nishimatsuya':'西松屋','birthday-aizumi':'Birthday','akachan-aizumi':'アカチャンホンポ','direx':'ダイレックス','doramori':'ドラッグストアモリ','cosmos':'ドラッグコスモス','lady':'レデイ薬局','aoki':'クスリのアオキ','donki':'ドン・キホーテ','costco':'コストコオンライン'
+      };
       for(let i=0;i<ids.length;i++){
-        setMessage(`最新チラシを取得・解析中… ${i+1}/${ids.length}`);
-        const res=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:ids[i],batchId})});
-        const json=await res.json();
-        if(!res.ok) throw new Error(json.error||`${ids[i]} の更新に失敗しました`);
-        snapshot={...snapshot,results:(snapshot.results||[]).map(r=>r.id===json.result.id?json.result:r),persistence:json.persistence||snapshot.persistence};
-        setData(snapshot);
+        const started=Date.now();
+        setElapsed(0);
+        setProgress({index:i+1,total:ids.length,store:names[ids[i]]||ids[i],phase:'店舗ページ・チラシを取得中'});
+        setMessage(`最新チラシを取得・解析中… ${i+1}/${ids.length} ${names[ids[i]]||ids[i]}`);
+        const timer=setInterval(()=>setElapsed(Math.floor((Date.now()-started)/1000)),1000);
+        try{
+          const controller=new AbortController();
+          const abortTimer=setTimeout(()=>controller.abort(),55000);
+          const res=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:ids[i],batchId}),signal:controller.signal});
+          clearTimeout(abortTimer);
+          const json=await res.json();
+          if(!res.ok) throw new Error(json.error||`${ids[i]} の更新に失敗しました`);
+          {
+            const current=[...(snapshot.results||[])];
+            const idx=current.findIndex(r=>r.id===json.result.id);
+            if(idx>=0) current[idx]=json.result; else current.push(json.result);
+            snapshot={...snapshot,results:current,persistence:json.persistence||snapshot.persistence};
+          }
+          setData(snapshot);
+          if(json.result?.error) failed++;
+        }catch(e){
+          failed++;
+          setMessage(`${names[ids[i]]||ids[i]} は失敗/タイムアウト。次の店舗へ進みます… (${e.name==='AbortError'?'55秒タイムアウト':e.message})`);
+        }finally{
+          clearInterval(timer);
+        }
       }
       const finalRes=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'finalize',batchId,snapshot})});
       const finalJson=await finalRes.json();
       if(!finalRes.ok) throw new Error(finalJson.error||'履歴保存に失敗しました');
-      setData(finalJson); setMessage('全店舗を更新し、履歴を保存しました');
+      setData(finalJson); setMessage(failed ? `更新完了：${ids.length-failed}店舗成功 / ${failed}店舗失敗。履歴を保存しました` : '全店舗を更新し、履歴を保存しました');
     } catch (e) {
       setMessage(`更新エラー: ${e.message}`);
       await load().catch(()=>{});
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setProgress(null); setElapsed(0); }
   }
 
   useEffect(() => { load().catch(e => setMessage(e.message)); }, []);
@@ -58,7 +84,7 @@ export default function Home() {
       <header className="topbar">
         <div>
           <p className="eyebrow">TOKUSHIMA BABY SALE</p>
-          <div className="mainTitleRow"><h1>ベビー用品 セールチェッカー</h1><span className="versionBadge">ver 2.2</span></div>
+          <div className="mainTitleRow"><h1>ベビー用品 セールチェッカー</h1><span className="versionBadge">ver 2.3</span></div>
           <p className="sub">最新チラシ・公開WEBクーポンから、ベビー用品だけを抽出します。</p>
         </div>
         <div className="actions">
@@ -75,6 +101,11 @@ export default function Home() {
       </section>
 
       {message && <p className="notice">{message}</p>}
+      {progress && <div className="progressPanel">
+        <div className="progressTop"><strong>{progress.store}</strong><span>{progress.index}/{progress.total} ・ {elapsed}秒</span></div>
+        <div className="progressTrack"><div className="progressBar" style={{width:`${Math.max(6,(progress.index-1)/progress.total*100)}%`}} /></div>
+        <small>{progress.phase}。1店舗55秒を超えた場合は次の店舗へ進みます。</small>
+      </div>}
       {!data.persistence?.database && <p className="warning">DATABASE_URL が未設定です。Vercel本番ではNeonを接続してください。未設定時は永続保存されません。</p>}
 
       <nav className="filters">
@@ -96,6 +127,8 @@ export default function Home() {
               </div>
             </div>
             {store.error && <p className="error">取得エラー: {store.error}</p>}
+            {!store.error && store.durationMs != null && <p className="storeMeta">前回処理時間: {(store.durationMs/1000).toFixed(1)}秒</p>}
+            {(store.warnings||[]).length>0 && <p className="warning storeWarning">{store.warnings.slice(0,3).join(' / ')}</p>}
             {!items.length ? <div className="empty">条件に合うベビー用品を確定できませんでした。推測値は表示していません。</div> :
               <div className="cards">{items.map((x, i) => <div className="card" key={`${x.product}-${i}`}>
                 <div className="icon">{icons[x.category] || '🧺'}</div>
