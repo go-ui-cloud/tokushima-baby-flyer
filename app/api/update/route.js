@@ -10,7 +10,7 @@ export const maxDuration=300;
 export async function POST(req){
   try{
     const body=await req.json().catch(()=>({}));
-    if(body.action==='prepare'){
+    if(body.action==='clear-cache'){
       const [blobResult]=await Promise.all([clearFlyerBlobs().catch(e=>({deleted:0,error:e.message})),clearCurrentCache().catch(()=>false)]);
       return NextResponse.json({ok:true,blob:blobResult},{headers:{'Cache-Control':'no-store, max-age=0'}});
     }
