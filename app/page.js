@@ -73,8 +73,20 @@ export default function Home(){
     currentAbortRef.current?.abort();
   }
 
+  async function syncProgress(){
+    try{
+      const r=await fetch('/api/progress',{cache:'no-store'}); if(!r.ok)throw new Error('進行状況を取得できませんでした');
+      const {progress:active}=await r.json(); await load();
+      if(!active){setMessage('実行中の更新は見つかりませんでした。最新の保存状態を読み込みました。');setProgress(null);return false;}
+      const idx=STORE_IDS.indexOf(active.storeId); currentStoreRef.current=active.storeId; currentBatchRef.current=active.batchId||null;
+      setProgress({index:idx>=0?idx+1:1,total:STORE_IDS.length,storeId:active.storeId,store:STORE_NAMES[active.storeId]||active.storeId,phase:active.phase||'処理中',detail:active.detail||'サーバーの進行状況へ同期しました',serverUpdatedAt:active.updatedAt,extra:active.extra||{}});
+      setMessage(`実行中の更新に同期しました：${STORE_NAMES[active.storeId]||active.storeId} / ${active.phase||'処理中'}`); return true;
+    }catch(e){setMessage(`進行状況の同期に失敗しました: ${e.message}`);return false;}
+  }
+
   async function update(){
-    if(loading)return;
+    if(loading){await syncProgress();return;}
+    if(await syncProgress())return;
     setLoading(true);const ids=STORE_IDS;const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
     try{
       // V2.16: 前回表示を保持したまま、取得に成功した店舗だけ順次差し替える。
@@ -126,8 +138,8 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30.8</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
-      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.31.0</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={clearing}>{loading?'🔄 進行状況を同期':'↻ 最新情報に更新'}</button></div>
     </header>
 
     <section className="summary">
