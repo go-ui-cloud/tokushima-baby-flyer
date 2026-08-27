@@ -78,9 +78,14 @@ export default function Home(){
           const controller=new AbortController();currentAbortRef.current=controller;const abortTimer=setTimeout(()=>controller.abort(),300000);
           const res=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:ids[i],batchId}),signal:controller.signal});clearTimeout(abortTimer);
           const json=await res.json();if(!res.ok)throw new Error(json.error||`${ids[i]} の更新に失敗しました`);
-          const current=[...(snapshot.results||[])];const idx=current.findIndex(r=>r.id===json.result.id);if(idx>=0)current[idx]=json.result;else current.push(json.result);
-          snapshot={...snapshot,results:current,persistence:json.persistence||snapshot.persistence};setData(snapshot);
-          if(json.result?.error){failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);}else if(json.result?.skipped){skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);}
+          if(json.result?.skipped){
+            skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);
+            setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示をそのまま残して次へ進みます…`);
+          }else{
+            const current=[...(snapshot.results||[])];const idx=current.findIndex(r=>r.id===json.result.id);if(idx>=0)current[idx]=json.result;else current.push(json.result);
+            snapshot={...snapshot,results:current,persistence:json.persistence||snapshot.persistence};setData(snapshot);
+            if(json.result?.error){failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);}
+          }
         }catch(e){
           if(skipRequestedRef.current){skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示を残して次へ進みます…`);}else{failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} は失敗/タイムアウト。前回表示を残して次へ進みます… (${e.name==='AbortError'?'最大300秒タイムアウト':e.message})`);}
         }finally{currentAbortRef.current=null;clearInterval(timer);clearInterval(progressPoll);}
@@ -97,7 +102,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.23</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.25</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
     </header>
 
