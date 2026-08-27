@@ -25,6 +25,15 @@ const PHASE_ICONS={
 function fmtDate(v){if(!v||v==='不明')return'不明';const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString('ja-JP');}
 function freshnessTone(text=''){if(/2段階一致|現在有効/.test(text))return'good';if(/古い|不一致|エラー/.test(text))return'bad';if(/スキップ|なし/.test(text))return'neutral';return'warn';}
 function itemKey(x,i){return `${x.product||'item'}|${x.flyerUrl||x.sourceUrl||''}|${i}`;}
+function displayItemsForStore(store,selectedCategories=null){
+  const filtered=store.id==='costco-online'?(store.items||[]).filter(x=>!selectedCategories||selectedCategories.has(x.category)):(store.items||[]);
+  if(store.id==='costco-online')return filtered;
+  const seen=new Set();
+  return filtered.filter(x=>{
+    if(!x.imageUrl||seen.has(x.imageUrl))return false;
+    seen.add(x.imageUrl);return true;
+  });
+}
 
 function ReadImages({images=[]}){
   const valid=images.filter(x=>x?.viewerUrl);
@@ -117,10 +126,13 @@ export default function Home(){
           if(json.result?.skipped){
             skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);
             setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示をそのまま残して次へ進みます…`);
+          }else if(json.result?.preservePrevious){
+            failed++;const failedId=json.result.id||ids[i];failedNames.push(STORE_NAMES[failedId]||failedId);
+            setMessage(`${STORE_NAMES[failedId]||failedId} は取得失敗。前回表示を残して次へ進みます…`);
           }else{
             const current=[...(snapshot.results||[])];const idx=current.findIndex(r=>r.id===json.result.id);if(idx>=0)current[idx]=json.result;else current.push(json.result);
             snapshot={...snapshot,results:current,persistence:json.persistence||snapshot.persistence};setData(snapshot);
-            if(json.result?.error){failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);}
+            if(json.result?.error){failed++;const failedId=json.result.id||ids[i];failedNames.push(STORE_NAMES[failedId]||failedId);}
           }
         }catch(e){
           if(skipRequestedRef.current){skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示を残して次へ進みます…`);}else{failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} は失敗/タイムアウト。前回表示を残して次へ進みます… (${e.name==='AbortError'?'1回の処理が295秒でタイムアウト':e.message})`);}
@@ -134,11 +146,11 @@ export default function Home(){
   useEffect(()=>{load().catch(e=>setMessage(e.message));},[]);
   const availableStoreIds=useMemo(()=>STORE_IDS.filter(id=>(data.results||[]).some(r=>r.id===id)),[data]);
   const visibleResults=(data.results||[]).filter(store=>visibleStores.has(store.id));
-  const totals=useMemo(()=>{const results=data.results||[];return{stores:results.length,items:results.reduce((n,r)=>n+(r.items?.length||0),0),healthy:results.filter(r=>!r.error&&!r.skipped).length};},[data]);
+  const totals=useMemo(()=>{const results=data.results||[];return{stores:results.length,items:results.reduce((n,r)=>n+displayItemsForStore(r).length,0),healthy:results.filter(r=>!r.error&&!r.skipped).length};},[data]);
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.31.8</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.32.0</span></div><p className="sub">コストコオンラインは商品情報カード、それ以外の店舗は取得した商品画像のみを表示します。前回の表示を残したまま店舗ごとに更新します。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={clearing}>{loading?'🔄 進行状況を同期':'↻ 最新情報に更新'}</button></div>
     </header>
 
@@ -156,7 +168,7 @@ export default function Home(){
     <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())}/></section>
 
     <section className="storeList">{visibleResults.map(store=>{
-      const items=(store.items||[]).filter(x=>visibleCategories.has(x.category));const tone=freshnessTone(store.flyerFreshness||'');
+      const items=displayItemsForStore(store,visibleCategories);const tone=freshnessTone(store.flyerFreshness||'');
       return <article className="store" key={store.id}>
         <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><span className="area">{store.area}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
           <div className="sourceLinks">{store.id==='costco-online'&&store.sourceUrls?.length?store.sourceUrls.map((src,i)=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元{i+1}</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}{(store.flyers||[]).filter(f=>f.viewerUrl||/^https?:/i.test(f.url||'')).slice(0,6).map((f,i)=><a key={`${f.url}-${i}`} href={f.viewerUrl||f.url} target="_blank" rel="noreferrer" title={`掲載側: ${f.sourceDateCheck?.raw||'不明'} / チラシ内: ${f.dateCheck?.raw||'不明'}`}>📰 チラシ{(store.flyers||[]).length>1?i+1:''}</a>)}{(store.readImages||[]).length>0&&(store.readImages||[]).length<=6&&<ReadImages images={store.readImages}/>}</div>
@@ -165,7 +177,7 @@ export default function Home(){
         <div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}{store.extendedAnalysis&&<span className="metaChip">⏳ 5分×最大2回</span>}{store.id!=='costco-online'&&store.sourceProvider&&<span className="metaChip">📡 {store.sourceProvider}</span>}</div>
         {store.error&&<p className="error">❌ 取得エラー: {store.error}</p>}{(store.warnings||[]).length>0&&<p className="warning storeWarning">⚠️ {store.warnings.slice(0,3).join(' / ')}</p>}
         {!items.length?<div className="empty"><span className="emptyIcon">🗂️</span><div><strong>表示できる商品はありません</strong><p>{store.id==='costco-online'?'指定したコストコオンライン2ページで赤文字の「引き後」がある商品を確認できませんでした。':'現在の最新チラシ内で、表示対象カテゴリのベビー用品を確認できませんでした。'}</p></div></div>:
-        <div className="cards">{items.map((x,i)=><div className={`card ${store.id==='costco-online'?'costcoCard':''} ${store.id==='akachan-aizumi'?'akachanCard':''}`} key={itemKey(x,i)}>{x.imageUrl?<div className="productImageWrap"><img className={store.id==='costco-online'?'costcoThumb':'flyerThumb'} src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div>:<div className="icon">{CATEGORY_META[x.category]?.icon||'🧺'}</div>}{x.sourceGroup&&<span className="sourceGroup">📌 {x.sourceGroup}</span>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><h3>{x.product}</h3>{x.discountAfter&&<div className="discountAfter">🔥 {x.discountAfter}</div>}<div className="price">{x.price}</div><dl><div><dt>開始日</dt><dd>{x.startDate}</dd></div><div><dt>終了日</dt><dd>{x.endDate}</dd></div>{store.id!=='costco-online'&&<div><dt>抽出方法</dt><dd>{x.confidence}</dd></div>}</dl><a className="detailLink" href={x.flyerUrl!=='不明'?x.flyerUrl:x.sourceUrl} target="_blank" rel="noreferrer">情報を確認 ↗</a></div>)}</div>}
+        store.id==='costco-online'?<div className="cards">{items.map((x,i)=><div className="card costcoCard" key={itemKey(x,i)}>{x.imageUrl?<div className="productImageWrap"><img className="costcoThumb" src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div>:<div className="icon">{CATEGORY_META[x.category]?.icon||'🧺'}</div>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><h3>{x.product}</h3>{x.discountAfter&&<div className="discountAfter">🔥 {x.discountAfter}</div>}<div className="price">{x.price}</div><dl><div><dt>開始日</dt><dd>{x.startDate}</dd></div><div><dt>終了日</dt><dd>{x.endDate}</dd></div></dl><a className="detailLink" href={x.flyerUrl!=='不明'?x.flyerUrl:x.sourceUrl} target="_blank" rel="noreferrer">情報を確認 ↗</a></div>)}</div>:<div className="imageOnlyGrid">{items.map((x,i)=><a className="imageOnlyCard" key={`${x.imageUrl}-${i}`} href={x.imageUrl} target="_blank" rel="noreferrer" title="商品画像を拡大"><img src={x.imageUrl} alt={x.product||'商品画像'} loading="lazy" referrerPolicy="no-referrer"/></a>)}</div>}
       </article>;
     })}</section>
   </main>;
