@@ -25,6 +25,18 @@ function fmtDate(v){if(!v||v==='不明')return'不明';const d=new Date(v);retur
 function freshnessTone(text=''){if(/2段階一致|現在有効/.test(text))return'good';if(/古い|不一致|エラー/.test(text))return'bad';if(/スキップ|なし/.test(text))return'neutral';return'warn';}
 function itemKey(x,i){return `${x.product||'item'}|${x.flyerUrl||x.sourceUrl||''}|${i}`;}
 
+function ReadImages({images=[]}){
+  const valid=images.filter(x=>x?.viewerUrl);
+  if(!valid.length)return null;
+  if(valid.length<=6){
+    return <div className="readImageLinks">{valid.map((x,i)=><a key={`${x.viewerUrl}-${i}`} href={x.viewerUrl} target="_blank" rel="noreferrer" title={`${x.sourceGroup||'読み取り画像'} / OCR: ${x.ocrOk?'成功':'確認不足'}`}>🖼 読取画像{i+1}</a>)}</div>;
+  }
+  return <details className="readImagesBox">
+    <summary>🖼 読み取り画像一覧（{valid.length}枚）</summary>
+    <div className="readImagesGrid">{valid.map((x,i)=><a key={`${x.viewerUrl}-${i}`} href={x.viewerUrl} target="_blank" rel="noreferrer"><span>画像{i+1}</span>{x.sourceGroup&&<small>{x.sourceGroup}</small>}</a>)}</div>
+  </details>;
+}
+
 function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,meta}){
   return <div className="toggleGroup">
     <div className="toggleGroupHead"><strong><span className="sectionIcon">{icon}</span>{title}</strong><div><button onClick={onAll}>すべて表示</button><button onClick={onNone}>すべて非表示</button></div></div>
@@ -102,7 +114,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.28</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
     </header>
 
@@ -123,9 +135,10 @@ export default function Home(){
       const items=(store.items||[]).filter(x=>visibleCategories.has(x.category));const tone=freshnessTone(store.flyerFreshness||'');
       return <article className="store" key={store.id}>
         <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><span className="area">{store.area}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
-          <div className="sourceLinks">{store.id==='costco-online'&&store.sourceUrls?.length?store.sourceUrls.map((src,i)=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元{i+1}</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}{(store.flyers||[]).filter(f=>f.viewerUrl||/^https?:/i.test(f.url||'')).slice(0,6).map((f,i)=><a key={`${f.url}-${i}`} href={f.viewerUrl||f.url} target="_blank" rel="noreferrer" title={`掲載側: ${f.sourceDateCheck?.raw||'不明'} / チラシ内: ${f.dateCheck?.raw||'不明'}`}>📰 チラシ{(store.flyers||[]).length>1?i+1:''}</a>)}</div>
+          <div className="sourceLinks">{store.id==='costco-online'&&store.sourceUrls?.length?store.sourceUrls.map((src,i)=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元{i+1}</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}{(store.flyers||[]).filter(f=>f.viewerUrl||/^https?:/i.test(f.url||'')).slice(0,6).map((f,i)=><a key={`${f.url}-${i}`} href={f.viewerUrl||f.url} target="_blank" rel="noreferrer" title={`掲載側: ${f.sourceDateCheck?.raw||'不明'} / チラシ内: ${f.dateCheck?.raw||'不明'}`}>📰 チラシ{(store.flyers||[]).length>1?i+1:''}</a>)}{(store.readImages||[]).length>0&&(store.readImages||[]).length<=6&&<ReadImages images={store.readImages}/>}</div>
         </div>
-        <div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}{store.extendedAnalysis&&<span className="metaChip">🕔 5分モード</span>}{store.id!=='costco-online'&&store.sourceProvider&&<span className="metaChip">📡 {store.sourceProvider}</span>}</div>
+        {(store.readImages||[]).length>6&&<ReadImages images={store.readImages}/>}
+        <div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}{store.extendedAnalysis&&<span className="metaChip">⏳ 10分モード</span>}{store.id!=='costco-online'&&store.sourceProvider&&<span className="metaChip">📡 {store.sourceProvider}</span>}</div>
         {store.error&&<p className="error">❌ 取得エラー: {store.error}</p>}{(store.warnings||[]).length>0&&<p className="warning storeWarning">⚠️ {store.warnings.slice(0,3).join(' / ')}</p>}
         {!items.length?<div className="empty"><span className="emptyIcon">🗂️</span><div><strong>表示できる商品はありません</strong><p>{store.id==='costco-online'?'指定したコストコオンライン2ページで赤文字の「引き後」がある商品を確認できませんでした。':'現在の最新チラシ内で、表示対象カテゴリのベビー用品を確認できませんでした。'}</p></div></div>:
         <div className="cards">{items.map((x,i)=><div className={`card ${store.id==='costco-online'?'costcoCard':''} ${store.id==='akachan-aizumi'?'akachanCard':''}`} key={itemKey(x,i)}>{x.imageUrl?<div className="productImageWrap"><img className={store.id==='costco-online'?'costcoThumb':'flyerThumb'} src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div>:<div className="icon">{CATEGORY_META[x.category]?.icon||'🧺'}</div>}{x.sourceGroup&&<span className="sourceGroup">📌 {x.sourceGroup}</span>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><h3>{x.product}</h3>{x.discountAfter&&<div className="discountAfter">🔥 {x.discountAfter}</div>}<div className="price">{x.price}</div><dl><div><dt>開始日</dt><dd>{x.startDate}</dd></div><div><dt>終了日</dt><dd>{x.endDate}</dd></div>{store.id!=='costco-online'&&<div><dt>抽出方法</dt><dd>{x.confidence}</dd></div>}</dl><a className="detailLink" href={x.flyerUrl!=='不明'?x.flyerUrl:x.sourceUrl} target="_blank" rel="noreferrer">情報を確認 ↗</a></div>)}</div>}
