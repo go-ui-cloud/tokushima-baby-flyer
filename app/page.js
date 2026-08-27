@@ -19,7 +19,7 @@ const STORE_ICONS={
   'nishimatsuya':'🛒','birthday-aizumi':'🎈','akachan-aizumi':'👶','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦'
 };
 const PHASE_ICONS={
-  '開始':'▶','店舗ページ確認中':'🌐','セール情報を確認中':'🔎','対象バナーを発見':'🎯','対象バナー確認':'🔎','対象バナーをクリック中':'👆','縦長ページを精査中':'📜','チラシを検索中':'🔎','チラシを発見':'✅','チラシ未発見':'⚠️','チラシ保存中':'💾','OCRを実行中':'🔤','日付確認中':'📅','商品抽出中':'🧺','10分継続モード':'⏱️','継続処理':'🔁','時間上限':'⌛','完了':'✅','スキップ':'⏭️','エラー':'❌'
+  '開始':'▶','店舗ページ確認中':'🌐','セール情報を確認中':'🔎','対象バナーを発見':'🎯','対象バナー確認':'🔎','対象バナーをクリック中':'👆','縦長ページを精査中':'📜','チラシを検索中':'🔎','チラシを発見':'✅','チラシ未発見':'⚠️','チラシ保存中':'💾','OCRを実行中':'🔤','日付確認中':'📅','商品抽出中':'🧺','5分モードへ延長':'⏱️','時間上限':'⌛','完了':'✅','スキップ':'⏭️','エラー':'❌'
 };
 
 function fmtDate(v){if(!v||v==='不明')return'不明';const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString('ja-JP');}
@@ -126,7 +126,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30.3</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30.4</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
     </header>
 
