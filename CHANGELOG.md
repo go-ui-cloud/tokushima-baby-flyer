@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v2.31.3
+- V2.31.2のデプロイ後も発生した `nishimatsuyaItemFromRegions is not defined` を解消。
+- 西松屋の商品生成で当該関数呼び出しを完全に廃止し、更新処理内で領域OCR結果から直接商品を生成。
+- 左下の商品名、右下の税込価格、税込価格なしは非表示、分類不能は「その他」の仕様を維持。
+
 ## v2.31.2
 - 西松屋更新時の `nishimatsuyaItemFromRegions is not defined` を修正。
 - 領域OCRの商品生成関数をモジュール共通スコープに定義し、呼び出し名を統一。
