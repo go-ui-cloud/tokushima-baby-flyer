@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-const CATEGORY_ORDER=['おむつ・おしりふき','粉ミルク・液体ミルク','離乳食・ベビーフード','おもちゃ','ベビーケア・その他'];
+const CATEGORY_ORDER=['おむつ・おしりふき','粉ミルク・液体ミルク','離乳食・ベビーフード','おもちゃ','ベビーケア・その他','その他'];
 const CATEGORY_META={
   'おむつ・おしりふき':{icon:'🧷',short:'おむつ・おしりふき'},
   '粉ミルク・液体ミルク':{icon:'🍼',short:'ミルク'},
   '離乳食・ベビーフード':{icon:'🥣',short:'離乳食・ベビーフード'},
   'おもちゃ':{icon:'🧸',short:'おもちゃ'},
-  'ベビーケア・その他':{icon:'🧴',short:'ケア・その他'}
+  'ベビーケア・その他':{icon:'🧴',short:'ケア・その他'},
+  'その他':{icon:'📦',short:'その他'}
 };
 const STORE_IDS=['nishimatsuya','birthday-aizumi','akachan-aizumi','direx','doramori','cosmos','lady','aoki','donki','costco-online'];
 const STORE_NAMES={
@@ -18,7 +19,7 @@ const STORE_ICONS={
   'nishimatsuya':'🛒','birthday-aizumi':'🎈','akachan-aizumi':'👶','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦'
 };
 const PHASE_ICONS={
-  '開始':'▶','店舗ページ確認中':'🌐','セール情報を確認中':'🔎','対象バナーを発見':'🎯','対象バナー確認':'🔎','対象バナーをクリック中':'👆','縦長ページを精査中':'📜','チラシを検索中':'🔎','チラシを発見':'✅','チラシ未発見':'⚠️','チラシ保存中':'💾','OCRを実行中':'🔤','日付確認中':'📅','商品抽出中':'🧺','5分モードへ延長':'⏱️','時間上限':'⌛','完了':'✅','スキップ':'⏭️','エラー':'❌'
+  '開始':'▶','店舗ページ確認中':'🌐','セール情報を確認中':'🔎','対象バナーを発見':'🎯','対象バナー確認':'🔎','対象バナーをクリック中':'👆','縦長ページを精査中':'📜','チラシを検索中':'🔎','チラシを発見':'✅','チラシ未発見':'⚠️','チラシ保存中':'💾','OCRを実行中':'🔤','日付確認中':'📅','商品抽出中':'🧺','10分継続モード':'⏱️','継続処理':'🔁','時間上限':'⌛','完了':'✅','スキップ':'⏭️','エラー':'❌'
 };
 
 function fmtDate(v){if(!v||v==='不明')return'不明';const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString('ja-JP');}
@@ -125,7 +126,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30.1</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30.3</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
     </header>
 
@@ -137,7 +138,7 @@ export default function Home(){
     </section>
 
     {message&&<p className="notice">ℹ️ {message}</p>}
-    {progress&&<div className="progressPanel"><div className="progressTop"><div className="progressStore"><span>{STORE_ICONS[progress.storeId]||'🏪'}</span><strong>{progress.store}</strong></div><span>{progress.index}/{progress.total} ・ {elapsed}秒</span></div><div className="progressTrack"><div className="progressBar" style={{width:`${Math.max(6,(progress.index-1)/progress.total*100)}%`}}/></div><div className="progressPhase"><span className="phaseIcon">{PHASE_ICONS[progress.phase]||'•'}</span><strong>{progress.phase}</strong>{progress.detail&&<span>{progress.detail}</span>}</div><div className="progressActions"><button type="button" onClick={skipCurrent}>⏭ この店舗をスキップ</button></div><small>通常は1店舗120秒。文字量・ページ数が多い場合のみ最大300秒（5分）まで自動延長します。</small></div>}
+    {progress&&<div className="progressPanel"><div className="progressTop"><div className="progressStore"><span>{STORE_ICONS[progress.storeId]||'🏪'}</span><strong>{progress.store}</strong></div><span>{progress.index}/{progress.total} ・ {elapsed}秒</span></div><div className="progressTrack"><div className="progressBar" style={{width:`${Math.max(6,(progress.index-1)/progress.total*100)}%`}}/></div><div className="progressPhase"><span className="phaseIcon">{PHASE_ICONS[progress.phase]||'•'}</span><strong>{progress.phase}</strong>{progress.detail&&<span>{progress.detail}</span>}</div><div className="progressActions"><button type="button" onClick={skipCurrent}>⏭ この店舗をスキップ</button></div><small>通常は1店舗約5分。文字量・ページ数が多い場合は5分処理を最大2回に分け、合計約10分まで継続します。</small></div>}
     {!data.persistence?.database&&<p className="warning">⚠️ Neon/Postgres の接続情報を確認できません。既存のVercel Storage連携またはEnvironment Variablesを確認してください。</p>}
 
     <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())}/></section>
