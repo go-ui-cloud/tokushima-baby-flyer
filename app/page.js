@@ -87,9 +87,20 @@ export default function Home(){
         const timer=setInterval(()=>setElapsed(Math.floor((Date.now()-started)/1000)),1000);
         const progressPoll=setInterval(async()=>{try{const r=await fetch(`/api/progress?storeId=${encodeURIComponent(ids[i])}`,{cache:'no-store'});if(!r.ok)return;const j=await r.json();const p=j.progress;if(p&&(!p.batchId||p.batchId===batchId))setProgress(prev=>({...prev,phase:p.phase||prev?.phase,detail:p.detail||'',serverUpdatedAt:p.updatedAt,extra:p.extra||{}}));}catch{}},1200);
         try{
-          const controller=new AbortController();currentAbortRef.current=controller;const abortTimer=setTimeout(()=>controller.abort(),300000);
-          const res=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:ids[i],batchId}),signal:controller.signal});clearTimeout(abortTimer);
-          const json=await res.json();if(!res.ok)throw new Error(json.error||`${ids[i]} の更新に失敗しました`);
+          let json=null;let continuationPass=1;let startAssetIndex=0;let previousResult=null;
+          while(continuationPass<=2){
+            const controller=new AbortController();currentAbortRef.current=controller;const abortTimer=setTimeout(()=>controller.abort(),295000);
+            const res=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:ids[i],batchId,startAssetIndex,previousResult,continuationPass}),signal:controller.signal});clearTimeout(abortTimer);
+            json=await res.json();if(!res.ok)throw new Error(json.error||`${ids[i]} の更新に失敗しました`);
+            if(json.result?.skipped)break;
+            if(json.result?.needsContinuation&&continuationPass<2){
+              previousResult=json.result;startAssetIndex=json.result.nextAssetIndex||0;continuationPass++;
+              setMessage(`${STORE_NAMES[ids[i]]||ids[i]}：5分処理の続き（2/2）を実行します…`);
+              setProgress(prev=>({...prev,phase:'継続処理',detail:`Vercel制限のため2回目の5分処理を開始します（画像 ${startAssetIndex+1} から）`}));
+              continue;
+            }
+            break;
+          }
           if(json.result?.skipped){
             skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);
             setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示をそのまま残して次へ進みます…`);
@@ -99,7 +110,7 @@ export default function Home(){
             if(json.result?.error){failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);}
           }
         }catch(e){
-          if(skipRequestedRef.current){skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示を残して次へ進みます…`);}else{failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} は失敗/タイムアウト。前回表示を残して次へ進みます… (${e.name==='AbortError'?'最大300秒タイムアウト':e.message})`);}
+          if(skipRequestedRef.current){skipped++;skippedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} をスキップ。前回表示を残して次へ進みます…`);}else{failed++;failedNames.push(STORE_NAMES[ids[i]]||ids[i]);setMessage(`${STORE_NAMES[ids[i]]||ids[i]} は失敗/タイムアウト。前回表示を残して次へ進みます… (${e.name==='AbortError'?'1回の処理が295秒でタイムアウト':e.message})`);}
         }finally{currentAbortRef.current=null;clearInterval(timer);clearInterval(progressPoll);}
       }
       const finalRes=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'finalize',batchId,snapshot})});const finalJson=await finalRes.json();if(!finalRes.ok)throw new Error(finalJson.error||'履歴保存に失敗しました');setData(finalJson);
@@ -114,7 +125,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.30.1</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={loading||clearing}>{loading?'⏳ 解析中…':'↻ 最新情報に更新'}</button></div>
     </header>
 
@@ -138,7 +149,7 @@ export default function Home(){
           <div className="sourceLinks">{store.id==='costco-online'&&store.sourceUrls?.length?store.sourceUrls.map((src,i)=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元{i+1}</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}{(store.flyers||[]).filter(f=>f.viewerUrl||/^https?:/i.test(f.url||'')).slice(0,6).map((f,i)=><a key={`${f.url}-${i}`} href={f.viewerUrl||f.url} target="_blank" rel="noreferrer" title={`掲載側: ${f.sourceDateCheck?.raw||'不明'} / チラシ内: ${f.dateCheck?.raw||'不明'}`}>📰 チラシ{(store.flyers||[]).length>1?i+1:''}</a>)}{(store.readImages||[]).length>0&&(store.readImages||[]).length<=6&&<ReadImages images={store.readImages}/>}</div>
         </div>
         {(store.readImages||[]).length>6&&<ReadImages images={store.readImages}/>}
-        <div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}{store.extendedAnalysis&&<span className="metaChip">⏳ 10分モード</span>}{store.id!=='costco-online'&&store.sourceProvider&&<span className="metaChip">📡 {store.sourceProvider}</span>}</div>
+        <div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}{store.extendedAnalysis&&<span className="metaChip">⏳ 5分×最大2回</span>}{store.id!=='costco-online'&&store.sourceProvider&&<span className="metaChip">📡 {store.sourceProvider}</span>}</div>
         {store.error&&<p className="error">❌ 取得エラー: {store.error}</p>}{(store.warnings||[]).length>0&&<p className="warning storeWarning">⚠️ {store.warnings.slice(0,3).join(' / ')}</p>}
         {!items.length?<div className="empty"><span className="emptyIcon">🗂️</span><div><strong>表示できる商品はありません</strong><p>{store.id==='costco-online'?'指定したコストコオンライン2ページで赤文字の「引き後」がある商品を確認できませんでした。':'現在の最新チラシ内で、表示対象カテゴリのベビー用品を確認できませんでした。'}</p></div></div>:
         <div className="cards">{items.map((x,i)=><div className={`card ${store.id==='costco-online'?'costcoCard':''} ${store.id==='akachan-aizumi'?'akachanCard':''}`} key={itemKey(x,i)}>{x.imageUrl?<div className="productImageWrap"><img className={store.id==='costco-online'?'costcoThumb':'flyerThumb'} src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div>:<div className="icon">{CATEGORY_META[x.category]?.icon||'🧺'}</div>}{x.sourceGroup&&<span className="sourceGroup">📌 {x.sourceGroup}</span>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><h3>{x.product}</h3>{x.discountAfter&&<div className="discountAfter">🔥 {x.discountAfter}</div>}<div className="price">{x.price}</div><dl><div><dt>開始日</dt><dd>{x.startDate}</dd></div><div><dt>終了日</dt><dd>{x.endDate}</dd></div>{store.id!=='costco-online'&&<div><dt>抽出方法</dt><dd>{x.confidence}</dd></div>}</dl><a className="detailLink" href={x.flyerUrl!=='不明'?x.flyerUrl:x.sourceUrl} target="_blank" rel="noreferrer">情報を確認 ↗</a></div>)}</div>}
