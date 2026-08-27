@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateStore } from '../../../lib/update.js';
-import { finalizeHistory, getLatest, clearCurrentCache } from '../../../lib/db.js';
+import { finalizeHistory, getLatest, getLatestNonEmptyStoreResult, clearCurrentCache } from '../../../lib/db.js';
 import { clearFlyerBlobs } from '../../../lib/blob.js';
 
 export const runtime='nodejs';
@@ -16,7 +16,10 @@ export async function POST(req){
     }
     if(body.action==='finalize') return NextResponse.json(await finalizeHistory(body.batchId||null,body.snapshot||null),{headers:{'Cache-Control':'no-store, max-age=0'}});
     if(!body.storeId) return NextResponse.json({error:'storeId が必要です'},{status:400});
-    const result=await updateStore(body.storeId,body.batchId||null,{startAssetIndex:body.startAssetIndex||0,previousResult:body.previousResult||null,continuationPass:body.continuationPass||1});
+    const fallbackPreviousResult=body.storeId==='nishimatsuya'
+      ? await getLatestNonEmptyStoreResult(body.storeId)
+      : null;
+    const result=await updateStore(body.storeId,body.batchId||null,{startAssetIndex:body.startAssetIndex||0,previousResult:body.previousResult||null,fallbackPreviousResult,continuationPass:body.continuationPass||1});
     const latest=await getLatest();
     return NextResponse.json({ok:true,result,persistence:latest.persistence},{headers:{'Cache-Control':'no-store, max-age=0'}});
   }catch(e){return NextResponse.json({error:e.message},{status:500,headers:{'Cache-Control':'no-store, max-age=0'}});}

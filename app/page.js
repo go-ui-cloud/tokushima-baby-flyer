@@ -138,7 +138,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.31.4</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 2.31.5</span></div><p className="sub">指定された各社の公式URLだけを使用。前回の表示を残したまま店舗ごとに更新します。キャッシュ削除は必要なときだけ手動で実行できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={clearing}>{loading?'🔄 進行状況を同期':'↻ 最新情報に更新'}</button></div>
     </header>
 
