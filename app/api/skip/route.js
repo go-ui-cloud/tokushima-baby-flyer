@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requestSkip, saveProgress } from '../../../lib/db.js';
+import { isAdminRequest } from '../../../lib/admin-auth.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export async function POST(req){
   try{
+    if(!isAdminRequest(req))return NextResponse.json({error:'管理者ログインが必要です'},{status:401});
     const body=await req.json().catch(()=>({}));
     if(!body.storeId) return NextResponse.json({error:'storeId が必要です'},{status:400});
     await requestSkip(body.storeId,body.batchId||null);

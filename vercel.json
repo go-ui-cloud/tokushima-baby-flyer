@@ -2,6 +2,7 @@
   "functions": {
     "app/api/update/route.js": { "maxDuration": 300 },
     "app/api/latest/route.js": { "maxDuration": 30 },
+    "app/api/manual-items/route.js": { "maxDuration": 30 },
     "app/api/history.csv/route.js": { "maxDuration": 30 }
   }
 }

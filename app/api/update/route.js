@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isAdminRequest } from '../../../lib/admin-auth.js';
 import { updateStore } from '../../../lib/update.js';
 import { finalizeHistory, getLatest, getLatestNonEmptyStoreResult, clearCurrentCache } from '../../../lib/db.js';
 import { clearFlyerBlobs } from '../../../lib/blob.js';
@@ -9,6 +10,7 @@ export const maxDuration=300;
 
 export async function POST(req){
   try{
+    if(!isAdminRequest(req))return NextResponse.json({error:'管理者ログインが必要です'},{status:401});
     const body=await req.json().catch(()=>({}));
     if(body.action==='clear-cache'){
       const [blobResult]=await Promise.all([clearFlyerBlobs().catch(e=>({deleted:0,error:e.message})),clearCurrentCache().catch(()=>false)]);
@@ -16,6 +18,7 @@ export async function POST(req){
     }
     if(body.action==='finalize') return NextResponse.json(await finalizeHistory(body.batchId||null,body.snapshot||null),{headers:{'Cache-Control':'no-store, max-age=0'}});
     if(!body.storeId) return NextResponse.json({error:'storeId が必要です'},{status:400});
+    if(body.storeId!=='costco-online')return NextResponse.json({error:'この店舗はV3.0.0から手動登録方式です'},{status:400});
     const fallbackPreviousResult=body.storeId==='nishimatsuya'
       ? await getLatestNonEmptyStoreResult(body.storeId)
       : null;
