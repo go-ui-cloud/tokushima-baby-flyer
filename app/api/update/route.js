@@ -18,7 +18,7 @@ export async function POST(req){
     }
     if(body.action==='finalize') return NextResponse.json(await finalizeHistory(body.batchId||null,body.snapshot||null),{headers:{'Cache-Control':'no-store, max-age=0'}});
     if(!body.storeId) return NextResponse.json({error:'storeId が必要です'},{status:400});
-    if(body.storeId!=='costco-online')return NextResponse.json({error:'この店舗はV3.0.0から手動登録方式です'},{status:400});
+    if(!['costco-online','uniqlo-online'].includes(body.storeId))return NextResponse.json({error:'この店舗は手動登録方式です'},{status:400});
     const fallbackPreviousResult=body.storeId==='nishimatsuya'
       ? await getLatestNonEmptyStoreResult(body.storeId)
       : null;

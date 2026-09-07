@@ -7,7 +7,7 @@ import { isAdminRequest } from '../../../lib/admin-auth.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
-const CATEGORIES=['おむつ・おしりふき','粉ミルク・液体ミルク','離乳食・ベビーフード','おもちゃ','ベビーケア・その他','その他'];
+const CATEGORIES=['おむつ・おしりふき','粉ミルク・液体ミルク','離乳食・ベビーフード','おもちゃ','ベビーケア・その他','ウェア','その他'];
 const SOURCE_TYPES=['チラシ','アプリ','その他'];
 
 export async function GET(){
@@ -24,7 +24,7 @@ export async function POST(req){
     const price=String(form.get('price')||'').trim();
     const category=String(form.get('category')||'').trim();
     const sourceType=String(form.get('sourceType')||'').trim();
-    if(!STORES.some(x=>x.id===storeId&&x.type!=='costco-online'))return NextResponse.json({error:'登録対象店舗が正しくありません'},{status:400});
+    if(!STORES.some(x=>x.id===storeId&&!['costco-online','uniqlo-online'].includes(x.type)))return NextResponse.json({error:'登録対象店舗が正しくありません'},{status:400});
     if(!product||!price||!CATEGORIES.includes(category)||!SOURCE_TYPES.includes(sourceType))return NextResponse.json({error:'商品名・価格・カテゴリ・情報元は必須です'},{status:400});
     const startDate=String(form.get('startDate')||''),endDate=String(form.get('endDate')||'');
     if(startDate&&endDate&&endDate<startDate)return NextResponse.json({error:'広告終了日は広告開始日以降にしてください'},{status:400});
