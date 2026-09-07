@@ -38,7 +38,7 @@ function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,me
 
 export default function Home(){
   const [data,setData]=useState({updatedAt:null,results:[],persistence:{}});
-  const [loading,setLoading]=useState(false);const [clearing,setClearing]=useState(false);const [message,setMessage]=useState('');const [progress,setProgress]=useState(null);const [elapsed,setElapsed]=useState(0);
+  const [loading,setLoading]=useState(false);const [message,setMessage]=useState('');const [progress,setProgress]=useState(null);const [elapsed,setElapsed]=useState(0);
   const [savingStore,setSavingStore]=useState(null);const [deletingId,setDeletingId]=useState(null);
   const [admin,setAdmin]=useState({loading:true,authenticated:false,configured:true});const [loggingIn,setLoggingIn]=useState(false);
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
@@ -71,17 +71,6 @@ export default function Home(){
     if(!window.confirm(`「${item.product}」を削除しますか？`))return;
     setDeletingId(item.id);
     try{const res=await fetch('/api/manual-items',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id})});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'削除に失敗しました');}await load();setMessage(`「${item.product}」を削除しました。`);}catch(e){setMessage(`削除エラー: ${e.message}`);}finally{setDeletingId(null);}
-  }
-
-  async function clearCache(){
-    if(loading||clearing)return;
-    if(!window.confirm('コストコの自動取得キャッシュと保存済みチラシ画像を削除します。手動登録商品とCSV履歴は残ります。実行しますか？'))return;
-    setClearing(true);setMessage('保存済みチラシ画像と現在表示キャッシュを削除しています…');
-    try{
-      const res=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'clear-cache'})});
-      const json=await res.json().catch(()=>({}));if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'キャッシュ削除に失敗しました');}
-      await load();setMessage(`自動取得キャッシュを削除しました${json.blob?.deleted!=null?`（チラシ ${json.blob.deleted} 件削除）`:''}。手動登録商品と履歴CSVは残っています。`);
-    }catch(e){setMessage(`キャッシュ削除エラー: ${e.message}`);}finally{setClearing(false);}
   }
 
   async function skipCurrent(){
@@ -159,8 +148,8 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.0.2</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコオンラインだけは公式ページから自動更新します。</p></div>
-      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><button className="cacheButton" onClick={clearCache} disabled={loading||clearing}>{clearing?'削除中…':'🧹 自動取得キャッシュ削除'}</button><button className="updateButton" onClick={update} disabled={clearing}>{loading?'🔄 進行状況を同期':'↻ コストコを更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.0.3</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコオンラインだけは公式ページから自動更新します。</p></div>
+      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><button className="updateButton" onClick={update}>{loading?'🔄 進行状況を同期':'↻ コストコを更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
     </header>
 
     <section className="summary">
