@@ -40,12 +40,12 @@ function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,me
 
 export default function Home(){
   const [data,setData]=useState({updatedAt:null,results:[],persistence:{}});
-  const [loading,setLoading]=useState(false);const [message,setMessage]=useState('');const [progress,setProgress]=useState(null);const [elapsed,setElapsed]=useState(0);
+  const [loading,setLoading]=useState(false);const [updatingStore,setUpdatingStore]=useState(null);const [message,setMessage]=useState('');const [progress,setProgress]=useState(null);const [elapsed,setElapsed]=useState(0);
   const [savingStore,setSavingStore]=useState(null);const [deletingId,setDeletingId]=useState(null);
   const [admin,setAdmin]=useState({loading:true,authenticated:false,configured:true});const [loggingIn,setLoggingIn]=useState(false);
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
   const [visibleStores,setVisibleStores]=useState(()=>new Set(STORE_IDS));
-  const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);
+  const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
   async function checkAuth(){const res=await fetch('/api/admin-auth',{cache:'no-store'});setAdmin({loading:false,...await res.json()});}
@@ -93,10 +93,12 @@ export default function Home(){
     }catch(e){setMessage(`進行状況の同期に失敗しました: ${e.message}`);return false;}
   }
 
-  async function update(){
-    if(loading){await syncProgress();return;}
-    if(await syncProgress())return;
-    setLoading(true);const ids=['costco-online','uniqlo-online'];const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
+  async function update(storeId){
+    if(!AUTOMATIC_STORE_IDS.has(storeId)){setMessage('更新対象が正しくありません。');return;}
+    if(loading||updateLockRef.current){await syncProgress();return;}
+    updateLockRef.current=true;
+    if(await syncProgress()){updateLockRef.current=false;return;}
+    setLoading(true);setUpdatingStore(storeId);const ids=[storeId];const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
     try{
       // V2.16: 前回表示を保持したまま、取得に成功した店舗だけ順次差し替える。
       let snapshot={updatedAt:data.updatedAt||null,results:[...(data.results||[])],persistence:data.persistence||{}};
@@ -140,7 +142,7 @@ export default function Home(){
       }
       const finalRes=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'finalize',batchId,snapshot})});const finalJson=await finalRes.json();if(!finalRes.ok)throw new Error(finalJson.error||'履歴保存に失敗しました');await load();
       setMessage(`更新完了：${ids.length-failed-skipped}店舗成功 / ${skipped}店舗スキップ${skippedNames.length?`（${skippedNames.join('、')}）`:''} / ${failed}店舗失敗${failedNames.length?`（${failedNames.join('、')}）`:''}。前回表示を維持しながら更新しました。`);
-    }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{setLoading(false);setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
+    }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{updateLockRef.current=false;setLoading(false);setUpdatingStore(null);setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
   }
 
   useEffect(()=>{Promise.all([load(),checkAuth()]).catch(e=>setMessage(e.message));},[]);
@@ -150,8 +152,8 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.1.0</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコオンラインとUNIQLOは公式ページから自動更新します。</p></div>
-      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><button className="updateButton" onClick={update}>{loading?'🔄 進行状況を同期':'↻ オンライン情報を更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.1.1</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコオンラインとUNIQLOは公式ページから個別に更新できます。</p></div>
+      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><button className="updateButton" onClick={()=>update('costco-online')} disabled={loading}>{loading&&updatingStore==='costco-online'?'🔄 コストコ更新中…':'↻ コストコを更新'}</button><button className="updateButton uniqloUpdateButton" onClick={()=>update('uniqlo-online')} disabled={loading}>{loading&&updatingStore==='uniqlo-online'?'🔄 UNIQLO更新中…':'↻ UNIQLOを更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
     </header>
 
     <section className="summary">
