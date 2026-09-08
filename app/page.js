@@ -14,6 +14,7 @@ const CATEGORY_META={
 };
 const STORE_IDS=['nishimatsuya','birthday-aizumi','akachan-aizumi','direx','doramori','cosmos','lady','aoki','donki','costco-online','uniqlo-online'];
 const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online']);
+const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online'];
 const STORE_NAMES={
   'nishimatsuya':'西松屋 徳島南矢三店','birthday-aizumi':'バースデイ 藍住店','akachan-aizumi':'アカチャンホンポ ゆめタウン徳島店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンラインチラシ'
 };
@@ -44,7 +45,7 @@ export default function Home(){
   const [savingStore,setSavingStore]=useState(null);const [deletingId,setDeletingId]=useState(null);
   const [admin,setAdmin]=useState({loading:true,authenticated:false,configured:true});const [loggingIn,setLoggingIn]=useState(false);
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
-  const [visibleStores,setVisibleStores]=useState(()=>new Set(STORE_IDS));
+  const [visibleStores,setVisibleStores]=useState(()=>new Set(DEFAULT_VISIBLE_STORE_IDS));
   const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
