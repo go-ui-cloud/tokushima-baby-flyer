@@ -26,8 +26,7 @@ export async function POST(req){
     const sourceType=String(form.get('sourceType')||'').trim();
     if(!STORES.some(x=>x.id===storeId&&!['costco-online','uniqlo-online'].includes(x.type)))return NextResponse.json({error:'登録対象店舗が正しくありません'},{status:400});
     if(!product||!price||!CATEGORIES.includes(category)||!SOURCE_TYPES.includes(sourceType))return NextResponse.json({error:'商品名・価格・カテゴリ・情報元は必須です'},{status:400});
-    const startDate=String(form.get('startDate')||''),endDate=String(form.get('endDate')||'');
-    if(startDate&&endDate&&endDate<startDate)return NextResponse.json({error:'広告終了日は広告開始日以降にしてください'},{status:400});
+    const endDate=String(form.get('endDate')||'');
     const image=form.get('image');
     const imageUrl=String(form.get('imageUrl')||'').trim();
     if(imageUrl.length>2000)return NextResponse.json({error:'商品画像URLが長すぎます'},{status:400});
@@ -35,7 +34,7 @@ export async function POST(req){
     if(image?.size>8*1024*1024)return NextResponse.json({error:'商品画像は8MB以下にしてください'},{status:400});
     if(image?.size&&!['image/jpeg','image/png','image/webp','image/gif','image/avif'].includes(String(image.type||'').toLowerCase()))return NextResponse.json({error:'商品画像はJPEG・PNG・WebP・GIF・AVIFを選択してください'},{status:400});
     const saved=image?.size?await persistManualImage(storeId,image):imageUrl?await persistManualImageFromUrl(storeId,imageUrl):{savedUrl:null,viewerUrl:null,sourceUrl:null};
-    const id=await addManualItem({storeId,product,price,category,sourceType,startDate,endDate,imageUrl:saved.viewerUrl,imageBlobUrl:saved.savedUrl,imageSourceUrl:saved.sourceUrl||null});
+    const id=await addManualItem({storeId,product,price,category,sourceType,endDate,imageUrl:saved.viewerUrl,imageBlobUrl:saved.savedUrl,imageSourceUrl:saved.sourceUrl||null});
     return NextResponse.json({ok:true,id},{headers:{'Cache-Control':'no-store'}});
   }catch(e){return NextResponse.json({error:e.message},{status:500});}
 }
