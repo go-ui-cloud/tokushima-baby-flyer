@@ -24,7 +24,7 @@ export async function POST(req){
     const price=String(form.get('price')||'').trim();
     const category=String(form.get('category')||'').trim();
     const sourceType=String(form.get('sourceType')||'').trim();
-    if(!STORES.some(x=>x.id===storeId&&!['costco-online','uniqlo-online'].includes(x.type)))return NextResponse.json({error:'登録対象店舗が正しくありません'},{status:400});
+    if(!STORES.some(x=>x.id===storeId&&!['costco-online','uniqlo-online','akachan-online'].includes(x.type)))return NextResponse.json({error:'登録対象店舗が正しくありません'},{status:400});
     if(!product||!price||!CATEGORIES.includes(category)||!SOURCE_TYPES.includes(sourceType))return NextResponse.json({error:'商品名・価格・カテゴリ・情報元は必須です'},{status:400});
     const endDate=String(form.get('endDate')||'');
     const image=form.get('image');
