@@ -33,10 +33,10 @@ function displayItemsForStore(store,selectedCategories=null){
   return (store.items||[]).filter(x=>!selectedCategories||selectedCategories.has(x.category));
 }
 
-function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,meta}){
+function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,meta,collapsible=false,expanded=true,onExpandedChange}){
   return <div className="toggleGroup">
-    <div className="toggleGroupHead"><strong><span className="sectionIcon">{icon}</span>{title}</strong><div><button onClick={onAll}>すべて表示</button><button onClick={onNone}>すべて非表示</button></div></div>
-    <div className="togglePills">{values.map(v=><button key={v} className={selected.has(v)?'on':'off'} onClick={()=>onToggle(v)}><span className="pillIcon">{meta?.[v]?.icon||''}</span><span>{selected.has(v)?'✓':'−'}</span>{labels?.[v]||meta?.[v]?.short||v}</button>)}</div>
+    <div className="toggleGroupHead"><strong><span className="sectionIcon">{icon}</span>{title}</strong><div>{collapsible&&<button type="button" className="panelToggleButton" aria-expanded={expanded} onClick={()=>onExpandedChange(!expanded)}>{expanded?'非表示':'表示'}</button>}{(!collapsible||expanded)&&<><button type="button" onClick={onAll}>すべて表示</button><button type="button" onClick={onNone}>すべて非表示</button></>}</div></div>
+    {(!collapsible||expanded)&&<div className="togglePills">{values.map(v=><button type="button" key={v} className={selected.has(v)?'on':'off'} onClick={()=>onToggle(v)}><span className="pillIcon">{meta?.[v]?.icon||''}</span><span>{selected.has(v)?'✓':'−'}</span>{labels?.[v]||meta?.[v]?.short||v}</button>)}</div>}
   </div>;
 }
 
@@ -47,6 +47,7 @@ export default function Home(){
   const [admin,setAdmin]=useState({loading:true,authenticated:false,configured:true});const [loggingIn,setLoggingIn]=useState(false);
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
   const [visibleStores,setVisibleStores]=useState(()=>new Set(DEFAULT_VISIBLE_STORE_IDS));
+  const [storeSelectorExpanded,setStoreSelectorExpanded]=useState(false);
   const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
@@ -170,7 +171,7 @@ export default function Home(){
     {progress&&<div className="progressPanel"><div className="progressTop"><div className="progressStore"><span>{STORE_ICONS[progress.storeId]||'🏪'}</span><strong>{progress.store}</strong></div><span>{progress.index}/{progress.total} ・ {elapsed}秒</span></div><div className="progressTrack"><div className="progressBar" style={{width:`${Math.max(6,(progress.index-1)/progress.total*100)}%`}}/></div><div className="progressPhase"><span className="phaseIcon">{PHASE_ICONS[progress.phase]||'•'}</span><strong>{progress.phase}</strong>{progress.detail&&<span>{progress.detail}</span>}</div><div className="progressActions"><button type="button" onClick={skipCurrent}>⏭ この店舗をスキップ</button></div><small>通常は1店舗約5分。文字量・ページ数が多い場合は5分処理を最大2回に分け、合計約10分まで継続します。</small></div>}
     {!data.persistence?.database&&<p className="warning">⚠️ Neon/Postgres の接続情報を確認できません。既存のVercel Storage連携またはEnvironment Variablesを確認してください。</p>}
 
-    <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())}/></section>
+    <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())} collapsible expanded={storeSelectorExpanded} onExpandedChange={setStoreSelectorExpanded}/></section>
 
     <section className="storeList">{visibleResults.map(store=>{
       const items=displayItemsForStore(store,visibleCategories);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);
