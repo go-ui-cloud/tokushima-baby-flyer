@@ -14,7 +14,7 @@ const CATEGORY_META={
 };
 const STORE_IDS=['nishimatsuya','birthday-aizumi','akachan-aizumi','direx','doramori','cosmos','lady','aoki','donki','costco-online','uniqlo-online','akachan-online'];
 const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-online']);
-const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online'];
+const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online','akachan-online'];
 const STORE_NAMES={
   'nishimatsuya':'西松屋 徳島南矢三店','birthday-aizumi':'バースデイ 藍住店','akachan-aizumi':'アカチャンホンポ ゆめタウン徳島店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンラインチラシ','akachan-online':'アカチャンホンポ オンライン'
 };
@@ -153,7 +153,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.2.0</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコ、UNIQLO、アカチャンホンポオンラインは公式ページから個別に更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.2.1</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコ、UNIQLO、アカチャンホンポオンラインは公式ページから個別に更新できます。</p></div>
       <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><button className="updateButton" onClick={()=>update('costco-online')} disabled={loading}>{loading&&updatingStore==='costco-online'?'🔄 コストコ更新中…':'↻ コストコを更新'}</button><button className="updateButton uniqloUpdateButton" onClick={()=>update('uniqlo-online')} disabled={loading}>{loading&&updatingStore==='uniqlo-online'?'🔄 UNIQLO更新中…':'↻ UNIQLOを更新'}</button><button className="updateButton akachanUpdateButton" onClick={()=>update('akachan-online')} disabled={loading}>{loading&&updatingStore==='akachan-online'?'🔄 アカチャンホンポ更新中…':'↻ アカチャンホンポを更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
     </header>
 
