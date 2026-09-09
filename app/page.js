@@ -12,14 +12,14 @@ const CATEGORY_META={
   'ウェア':{icon:'👕',short:'ウェア'},
   'その他':{icon:'📦',short:'その他'}
 };
-const STORE_IDS=['nishimatsuya','birthday-aizumi','akachan-aizumi','direx','doramori','cosmos','lady','aoki','donki','costco-online','uniqlo-online','akachan-online'];
-const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-online']);
-const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online','akachan-online'];
+const STORE_IDS=['birthday-aizumi','direx','doramori','cosmos','lady','aoki','donki','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
+const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-online','nishimatsuya-online']);
+const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
 const STORE_NAMES={
-  'nishimatsuya':'西松屋 徳島南矢三店','birthday-aizumi':'バースデイ 藍住店','akachan-aizumi':'アカチャンホンポ ゆめタウン徳島店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンラインチラシ','akachan-online':'アカチャンホンポ オンライン'
+  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンラインチラシ','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
 };
 const STORE_ICONS={
-  'nishimatsuya':'🛒','birthday-aizumi':'🎈','akachan-aizumi':'👶','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶'
+  'birthday-aizumi':'🎈','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶','nishimatsuya-online':'🛒'
 };
 const PHASE_ICONS={
   '開始':'▶','店舗ページ確認中':'🌐','セール情報を確認中':'🔎','対象バナーを発見':'🎯','対象バナー確認':'🔎','対象バナーをクリック中':'👆','縦長ページを精査中':'📜','チラシを検索中':'🔎','チラシを発見':'✅','チラシ未発見':'⚠️','チラシ保存中':'💾','OCRを実行中':'🔤','日付確認中':'📅','商品抽出中':'🧺','5分モードへ延長':'⏱️','時間上限':'⌛','完了':'✅','スキップ':'⏭️','エラー':'❌'
@@ -48,6 +48,8 @@ export default function Home(){
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
   const [visibleStores,setVisibleStores]=useState(()=>new Set(DEFAULT_VISIBLE_STORE_IDS));
   const [storeSelectorExpanded,setStoreSelectorExpanded]=useState(false);
+  const [selectedUpdateStore,setSelectedUpdateStore]=useState('');
+  const [expandedItemStores,setExpandedItemStores]=useState(()=>new Set());
   const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
@@ -143,7 +145,7 @@ export default function Home(){
       }
       const finalRes=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'finalize',batchId,snapshot})});const finalJson=await finalRes.json();if(!finalRes.ok)throw new Error(finalJson.error||'履歴保存に失敗しました');await load();
       setMessage(`更新完了：${ids.length-failed-skipped}店舗成功 / ${skipped}店舗スキップ${skippedNames.length?`（${skippedNames.join('、')}）`:''} / ${failed}店舗失敗${failedNames.length?`（${failedNames.join('、')}）`:''}。前回表示を維持しながら更新しました。`);
-    }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{updateLockRef.current=false;setLoading(false);setUpdatingStore(null);setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
+    }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{updateLockRef.current=false;setLoading(false);setUpdatingStore(null);setSelectedUpdateStore('');setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
   }
 
   useEffect(()=>{Promise.all([load(),checkAuth()]).catch(e=>setMessage(e.message));},[]);
@@ -153,8 +155,8 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.2.1</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。コストコ、UNIQLO、アカチャンホンポオンラインは公式ページから個別に更新できます。</p></div>
-      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><button className="updateButton" onClick={()=>update('costco-online')} disabled={loading}>{loading&&updatingStore==='costco-online'?'🔄 コストコ更新中…':'↻ コストコを更新'}</button><button className="updateButton uniqloUpdateButton" onClick={()=>update('uniqlo-online')} disabled={loading}>{loading&&updatingStore==='uniqlo-online'?'🔄 UNIQLO更新中…':'↻ UNIQLOを更新'}</button><button className="updateButton akachanUpdateButton" onClick={()=>update('akachan-online')} disabled={loading}>{loading&&updatingStore==='akachan-online'?'🔄 アカチャンホンポ更新中…':'↻ アカチャンホンポを更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.0</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="actions"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`:'↻ 選択した店舗を更新'}</button><button className="logoutButton" onClick={logout}>ログアウト</button></>}</div>
     </header>
 
     <section className="summary">
@@ -172,14 +174,15 @@ export default function Home(){
     <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())} collapsible expanded={storeSelectorExpanded} onExpandedChange={setStoreSelectorExpanded}/></section>
 
     <section className="storeList">{visibleResults.map(store=>{
-      const items=displayItemsForStore(store,visibleCategories);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);
+      const allItems=displayItemsForStore(store,visibleCategories);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
       return <article className="store" key={store.id}>
         <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><span className="area">{store.area}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
-          <div className="sourceLinks">{isAutomatic&&store.sourceUrls?.length?store.sourceUrls.map((src,i)=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元{i+1}</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}</div>
+          <div className="sourceLinks">{isAutomatic&&store.sourceUrls?.length?store.sourceUrls.map(src=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元（{src.label}）</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}</div>
         </div>
         {isAutomatic?<><div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}</div>{store.error&&<p className="error">❌ 取得エラー: {store.error}</p>}{(store.warnings||[]).length>0&&<p className="warning storeWarning">⚠️ {store.warnings.slice(0,3).join(' / ')}</p>}</>:admin.authenticated&&<details className="manualFormBox"><summary>＋ この店舗に商品を追加</summary><form className="manualForm" onSubmit={e=>addManualItem(e,store.id)}><label>商品名 <b>必須</b><input name="product" required maxLength="120"/></label><label>商品画像ファイル<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"/><small>URLを使う場合は選択しません</small></label><label className="manualWide">商品画像URL<input name="imageUrl" type="url" inputMode="url" maxLength="2000" placeholder="https://example.com/image.jpg"/><small>登録時に画像をダウンロードして保存します</small></label><label>価格 <b>必須</b><input name="price" required maxLength="40" placeholder="例：1,280円"/></label><label>広告終了日<input name="endDate" type="date"/></label><label>カテゴリ <b>必須</b><select name="category" required defaultValue=""><option value="" disabled>選択してください</option>{CATEGORY_ORDER.map(x=><option key={x} value={x}>{x}</option>)}</select></label><label>情報元 <b>必須</b><select name="sourceType" required defaultValue=""><option value="" disabled>選択してください</option><option value="チラシ">チラシ</option><option value="アプリ">アプリ</option><option value="その他">その他</option></select></label><button type="submit" disabled={savingStore===store.id}>{savingStore===store.id?'画像取得・登録中…':'商品を登録'}</button></form></details>}
         {!items.length?<div className="empty"><span className="emptyIcon">🗂️</span><div><strong>{isAutomatic?'表示できる商品はありません':'登録商品はまだありません'}</strong><p>{store.id==='costco-online'?'指定したコストコオンライン2ページで赤文字の「引き後」がある商品を確認できませんでした。':store.id==='uniqlo-online'?'UNIQLO公式ページで赤文字・値下げ・期間限定価格の商品を確認できませんでした。':store.id==='akachan-online'?'アカチャンホンポ公式の指定10ページで赤文字価格の商品を確認できませんでした。':admin.authenticated?'上の「この店舗に商品を追加」から安売り情報を登録してください。':'管理者ログイン後に安売り情報を登録できます。'}</p></div></div>:
         isAutomatic?<div className="cards">{items.map((x,i)=><div className="card costcoCard" key={itemKey(x,i)}>{x.imageUrl?<a className="productImageLink" href={productPageUrl(x)} target="_blank" rel="noreferrer" aria-label={`${x.product}の商品ページを開く`}><div className="productImageWrap"><img className="costcoThumb" src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div></a>:<div className="icon">{CATEGORY_META[x.category]?.icon||'🧺'}</div>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><h3>{x.product}</h3>{x.discountAfter&&<div className="discountAfter">🔥 {x.discountAfter}</div>}<div className="price">{x.price}</div><dl><div><dt>終了日</dt><dd>{x.endDate}</dd></div></dl><a className="detailLink" href={productPageUrl(x)} target="_blank" rel="noreferrer">情報を確認 ↗</a></div>)}</div>:<div className="cards manualCards">{items.map((x,i)=><div className="card manualCard" key={x.id||itemKey(x,i)}>{x.imageUrl?<div className="manualImageWrap"><img src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div>:<div className="manualNoImage">画像なし</div>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><span className="manualSource">情報元：{x.sourceType||'その他'}</span><h3>{x.product}</h3><div className="price">{x.price}</div><dl><div><dt>広告終了日</dt><dd>{x.endDate==='不明'?'未設定':x.endDate}</dd></div></dl>{admin.authenticated&&<button className="deleteManual" type="button" disabled={deletingId===x.id} onClick={()=>removeManualItem(x)}>{deletingId===x.id?'削除中…':'削除'}</button>}</div>)}</div>}
+        {allItems.length>5&&<button className="moreItemsButton" type="button" aria-expanded={itemListExpanded} onClick={()=>setExpandedItemStores(prev=>{const next=new Set(prev);next.has(store.id)?next.delete(store.id):next.add(store.id);return next;})}>{itemListExpanded?'折りたたむ':`もっと表示（残り${allItems.length-5}件）`}</button>}
       </article>;
     })}</section>
   </main>;
