@@ -155,7 +155,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.3</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.4</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`:'↻ 選択した店舗を更新'}</button></div>}</div>
     </header>
 
@@ -175,7 +175,7 @@ export default function Home(){
 
     <section className="storeList">{visibleResults.map(store=>{
       const allItems=displayItemsForStore(store,visibleCategories);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
-      return <article className="store" key={store.id}>
+      return <article className={`store store-${store.id}`} key={store.id}>
         <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><span className="area">{store.area}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
           <div className="sourceLinks">{isAutomatic&&store.sourceUrls?.length?store.sourceUrls.map(src=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元（{src.label}）</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}</div>
         </div>
