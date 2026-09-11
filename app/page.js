@@ -16,7 +16,7 @@ const STORE_IDS=['birthday-aizumi','direx','doramori','cosmos','lady','aoki','do
 const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-online','nishimatsuya-online']);
 const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
 const STORE_NAMES={
-  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンラインチラシ','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
+  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンライン','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
 };
 const STORE_ICONS={
   'birthday-aizumi':'🎈','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶','nishimatsuya-online':'🛒'
@@ -156,7 +156,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.5</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.6</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`:'↻ 選択した店舗を更新'}</button></div>}</div>
     </header>
 
