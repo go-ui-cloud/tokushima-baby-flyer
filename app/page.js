@@ -39,8 +39,9 @@ function groupedSourceLinks(sources=[]){
     return [{...src,label}];
   });
 }
-function displayItemsForStore(store,selectedCategories=null){
-  return (store.items||[]).filter(x=>!selectedCategories||selectedCategories.has(x.category));
+function normalizeSearchText(value=''){return String(value).normalize('NFKC').toLocaleLowerCase('ja-JP').trim();}
+function displayItemsForStore(store,selectedCategories=null,searchTerms=[]){
+  return (store.items||[]).filter(x=>(!selectedCategories||selectedCategories.has(x.category))&&(!searchTerms.length||searchTerms.every(term=>normalizeSearchText(x.product).includes(term))));
 }
 
 function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,meta,collapsible=false,expanded=true,onExpandedChange}){
@@ -59,6 +60,7 @@ export default function Home(){
   const [visibleStores,setVisibleStores]=useState(()=>new Set(DEFAULT_VISIBLE_STORE_IDS));
   const [storeSelectorExpanded,setStoreSelectorExpanded]=useState(false);
   const [selectedUpdateStore,setSelectedUpdateStore]=useState('');
+  const [searchInput,setSearchInput]=useState('');const [searchQuery,setSearchQuery]=useState('');
   const [expandedItemStores,setExpandedItemStores]=useState(()=>new Set());
   const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
@@ -161,12 +163,14 @@ export default function Home(){
 
   useEffect(()=>{Promise.all([load(),checkAuth()]).catch(e=>setMessage(e.message));},[]);
   const availableStoreIds=useMemo(()=>STORE_IDS.filter(id=>(data.results||[]).some(r=>r.id===id)),[data]);
-  const visibleResults=(data.results||[]).filter(store=>visibleStores.has(store.id));
+  const searchTerms=useMemo(()=>normalizeSearchText(searchQuery).split(/\s+/).filter(Boolean),[searchQuery]);
+  const visibleResults=(data.results||[]).filter(store=>visibleStores.has(store.id)&&(!searchTerms.length||displayItemsForStore(store,visibleCategories,searchTerms).length));
+  const searchResultCount=useMemo(()=>visibleResults.reduce((count,store)=>count+displayItemsForStore(store,visibleCategories,searchTerms).length,0),[visibleResults,visibleCategories,searchTerms]);
   const totals=useMemo(()=>{const results=data.results||[];return{stores:results.length,items:results.reduce((n,r)=>n+displayItemsForStore(r).length,0),healthy:results.filter(r=>!r.error&&!r.skipped).length};},[data]);
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.12</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.13</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div>}</div>
     </header>
 
@@ -177,6 +181,12 @@ export default function Home(){
       <div><span className="summaryIcon">💾</span><span>保存先</span><strong>{data.persistence?.database?'DB':'DB未設定'} / {data.persistence?.blob?'Blob':'元URL'}</strong></div>
     </section>
 
+    <form className="productSearch" role="search" onSubmit={event=>{event.preventDefault();setSearchQuery(searchInput.trim());}}>
+      <label htmlFor="product-search">🔎 商品名から探す</label>
+      <div className="productSearchControls"><input id="product-search" type="search" value={searchInput} onChange={event=>setSearchInput(event.target.value)} placeholder="例：パンパース、ボディスーツ" maxLength="80"/><button type="submit">検索</button>{searchQuery&&<button type="button" className="searchClearButton" onClick={()=>{setSearchInput('');setSearchQuery('');}}>検索解除</button>}</div>
+      <small>{searchQuery?`「${searchQuery}」の検索結果：${searchResultCount}件`:'商品名の一部を入力して検索できます。ログインは不要です。'}</small>
+    </form>
+
     {message&&<p className="notice">ℹ️ {message}</p>}
     {!admin.loading&&!admin.authenticated&&<section className="adminLogin"><div><strong>🔐 管理者ログイン</strong><p>商品を見るだけならログインは不要です。商品の登録・削除やオンライン情報の更新を行うときだけログインしてください。</p></div>{admin.configured?<form onSubmit={login}><input name="password" type="password" required autoComplete="current-password" placeholder="管理者パスワード"/><button disabled={loggingIn}>{loggingIn?'確認中…':'ログイン'}</button></form>:<p className="authError">Vercelに ADMIN_PASSWORD と ADMIN_SESSION_SECRET を設定してください。</p>}</section>}
     {progress&&<div className="progressPanel"><div className="progressTop"><div className="progressStore"><span>{STORE_ICONS[progress.storeId]||'🏪'}</span><strong>{progress.store}</strong></div><span>{progress.index}/{progress.total} ・ {elapsed}秒</span></div><div className="progressTrack"><div className="progressBar" style={{width:`${Math.max(6,(progress.index-1)/progress.total*100)}%`}}/></div><div className="progressPhase"><span className="phaseIcon">{PHASE_ICONS[progress.phase]||'•'}</span><strong>{progress.phase}</strong>{progress.detail&&<span>{progress.detail}</span>}</div><div className="progressActions"><button type="button" onClick={skipCurrent}>⏭ この店舗をスキップ</button></div><small>通常は1店舗約5分。文字量・ページ数が多い場合は5分処理を最大2回に分け、合計約10分まで継続します。</small></div>}
@@ -184,8 +194,9 @@ export default function Home(){
 
     <section className="filterPanel"><ToggleGroup title="カテゴリ表示" icon="🧩" values={CATEGORY_ORDER} selected={visibleCategories} meta={CATEGORY_META} onToggle={toggle(setVisibleCategories)} onAll={()=>setVisibleCategories(new Set(CATEGORY_ORDER))} onNone={()=>setVisibleCategories(new Set())}/><ToggleGroup title="店舗表示" icon="🏪" values={availableStoreIds.length?availableStoreIds:STORE_IDS} labels={STORE_NAMES} selected={visibleStores} onToggle={toggle(setVisibleStores)} onAll={()=>setVisibleStores(new Set(STORE_IDS))} onNone={()=>setVisibleStores(new Set())} collapsible expanded={storeSelectorExpanded} onExpandedChange={setStoreSelectorExpanded}/></section>
 
+    {searchTerms.length>0&&searchResultCount===0&&<div className="searchEmpty"><strong>該当する商品がありません</strong><p>別の商品名を入力するか、カテゴリ・店舗の表示設定を確認してください。</p></div>}
     <section className="storeList">{visibleResults.map(store=>{
-      const allItems=displayItemsForStore(store,visibleCategories);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
+      const allItems=displayItemsForStore(store,visibleCategories,searchTerms);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
       return <article className={`store store-${store.id}`} key={store.id}>
         <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><span className="area">{store.area}</span><span className="storeUpdated">更新日 {fmtStoreUpdate(store.checkedAt)}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
           <div className="sourceLinks">{isAutomatic&&store.sourceUrls?.length?groupedSourceLinks(store.sourceUrls).map(src=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元（{src.label}）</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}</div>

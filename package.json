@@ -1,6 +1,6 @@
 {
   "name": "tokushima-baby-flyer-vercel",
-  "version": "3.3.12",
+  "version": "3.3.13",
   "private": true,
   "type": "module",
   "packageManager": "npm@10.9.4",
