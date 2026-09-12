@@ -107,11 +107,12 @@ export default function Home(){
   }
 
   async function update(storeId){
-    if(!AUTOMATIC_STORE_IDS.has(storeId)){setMessage('更新対象が正しくありません。');return;}
+    const updateAll=storeId==='all-online';
+    if(!updateAll&&!AUTOMATIC_STORE_IDS.has(storeId)){setMessage('更新対象が正しくありません。');return;}
     if(loading||updateLockRef.current){await syncProgress();return;}
     updateLockRef.current=true;
     if(await syncProgress()){updateLockRef.current=false;return;}
-    setLoading(true);setUpdatingStore(storeId);const ids=[storeId];const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
+    setLoading(true);setUpdatingStore(updateAll?'all-online':storeId);const ids=updateAll?[...AUTOMATIC_STORE_IDS]:[storeId];const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
     try{
       // V2.16: 前回表示を保持したまま、取得に成功した店舗だけ順次差し替える。
       let snapshot={updatedAt:data.updatedAt||null,results:[...(data.results||[])],persistence:data.persistence||{}};
@@ -165,8 +166,8 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.9</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
-      <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`:'↻ 選択した店舗を更新'}</button></div>}</div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.11</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading&&updatingStore!=='all-online'?`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`:'↻ 選択した店舗を更新'}</button><button className="updateButton allOnlineUpdateButton" onClick={()=>update('all-online')} disabled={loading}>{loading&&updatingStore==='all-online'?'🔄 全店舗を更新中…':'↻ オンライン全店舗を更新'}</button></div>}</div>
     </header>
 
     <section className="summary">
