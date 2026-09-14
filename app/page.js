@@ -168,17 +168,17 @@ export default function Home(){
   const filteringProducts=searchTerms.length>0||knownEndOnly;
   const visibleResults=(data.results||[]).filter(store=>visibleStores.has(store.id)&&(!filteringProducts||displayItemsForStore(store,visibleCategories,searchTerms,knownEndOnly).length));
   const searchResultCount=useMemo(()=>visibleResults.reduce((count,store)=>count+displayItemsForStore(store,visibleCategories,searchTerms,knownEndOnly).length,0),[visibleResults,visibleCategories,searchTerms,knownEndOnly]);
-  const totals=useMemo(()=>{const results=data.results||[];return{stores:results.length,items:results.reduce((n,r)=>n+displayItemsForStore(r).length,0),healthy:results.filter(r=>!r.error&&!r.skipped).length};},[data]);
+  const totals=useMemo(()=>{const results=data.results||[];return{stores:results.length,visibleStores:results.filter(r=>visibleStores.has(r.id)).length,items:results.reduce((n,r)=>n+displayItemsForStore(r).length,0),healthy:results.filter(r=>!r.error&&!r.skipped).length};},[data,visibleStores]);
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.14</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.15</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div>}</div>
     </header>
 
     <section className="summary">
       <div><span className="summaryIcon">🕒</span><span>最終更新</span><strong>{data.updatedAt?fmtDate(data.updatedAt):'未更新'}</strong></div>
-      <div><span className="summaryIcon">🏪</span><span>表示店舗</span><strong>{totals.stores}店舗</strong></div>
+      <div><span className="summaryIcon">🏪</span><span>表示店舗</span><strong>{totals.visibleStores}店舗 / {totals.stores}店舗</strong></div>
       <div><span className="summaryIcon">🧺</span><span>取得商品</span><strong>{totals.items}件</strong></div>
       <div><span className="summaryIcon">💾</span><span>保存先</span><strong>{data.persistence?.database?'DB':'DB未設定'} / {data.persistence?.blob?'Blob':'元URL'}</strong></div>
     </section>
