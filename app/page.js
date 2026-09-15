@@ -55,7 +55,7 @@ function ToggleGroup({title,icon,values,labels,selected,onToggle,onAll,onNone,me
 export default function Home(){
   const [data,setData]=useState({updatedAt:null,results:[],persistence:{}});
   const [loading,setLoading]=useState(false);const [updatingStore,setUpdatingStore]=useState(null);const [message,setMessage]=useState('');const [progress,setProgress]=useState(null);const [elapsed,setElapsed]=useState(0);
-  const [savingStore,setSavingStore]=useState(null);const [deletingId,setDeletingId]=useState(null);
+  const [savingStore,setSavingStore]=useState(null);const [deletingId,setDeletingId]=useState(null);const [deletingDatabase,setDeletingDatabase]=useState(false);
   const [admin,setAdmin]=useState({loading:true,authenticated:false,configured:true});const [loggingIn,setLoggingIn]=useState(false);
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
   const [visibleStores,setVisibleStores]=useState(()=>new Set(DEFAULT_VISIBLE_STORE_IDS));
@@ -73,6 +73,18 @@ export default function Home(){
   }
   async function logout(){await fetch('/api/admin-auth',{method:'DELETE'});setAdmin(a=>({...a,authenticated:false}));setMessage('ログアウトしました。');}
   const toggle=(setter)=>(v)=>setter(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;});
+
+  async function deleteAllDatabaseData(){
+    if(loading||deletingDatabase)return;
+    const confirmed=window.confirm('データベース内の店舗取得結果・更新履歴・手動登録商品・進捗情報をすべて削除します。元に戻せません。\n\n同時に、Vercel Blobへ保存してから14日以上経過した画像も削除します。14日未満の画像は残します。実行しますか？');
+    if(!confirmed)return;
+    setDeletingDatabase(true);setMessage('データベースの全データを削除しています…');
+    try{
+      const res=await fetch('/api/database',{method:'DELETE'});const json=await res.json();
+      if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'データベースの削除に失敗しました');}
+      await load();setExpandedItemStores(new Set());setMessage(`データベースの全データを削除しました。14日以上経過したBlob画像は${json.deletedImages||0}件削除しました。`);
+    }catch(e){setMessage(`データベース削除エラー: ${e.message}`);}finally{setDeletingDatabase(false);}
+  }
 
   async function addManualItem(event,storeId){
     event.preventDefault();if(savingStore)return;
@@ -172,8 +184,8 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.15</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
-      <div className="actions"><div className="actionRow"><a className="ghostButton" href="/api/history.csv">📄 CSV履歴</a>{admin.authenticated&&<button className="logoutButton" onClick={logout}>ログアウト</button>}</div>{admin.authenticated&&<div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div>}</div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.18</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="databaseDeleteButton" type="button" onClick={deleteAllDatabaseData} disabled={loading||deletingDatabase}>{deletingDatabase?'削除中…':'DBデータ一括削除'}</button><button className="logoutButton" onClick={logout} disabled={deletingDatabase}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading||deletingDatabase}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||deletingDatabase||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
     </header>
 
     <section className="summary">
