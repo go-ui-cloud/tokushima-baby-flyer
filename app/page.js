@@ -21,6 +21,12 @@ const STORE_NAMES={
 const STORE_ICONS={
   'birthday-aizumi':'🎈','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶','nishimatsuya-online':'🛒'
 };
+function sharedVisibleStoresFromUrl(){
+  if(typeof window==='undefined')return null;
+  const params=new URLSearchParams(window.location.search);
+  if(!params.has('stores'))return null;
+  return new Set(String(params.get('stores')||'').split(',').filter(id=>STORE_IDS.includes(id)));
+}
 const PHASE_ICONS={
   '開始':'▶','店舗ページ確認中':'🌐','セール情報を確認中':'🔎','対象バナーを発見':'🎯','対象バナー確認':'🔎','対象バナーをクリック中':'👆','縦長ページを精査中':'📜','チラシを検索中':'🔎','チラシを発見':'✅','チラシ未発見':'⚠️','チラシ保存中':'💾','OCRを実行中':'🔤','日付確認中':'📅','商品抽出中':'🧺','5分モードへ延長':'⏱️','時間上限':'⌛','完了':'✅','スキップ':'⏭️','エラー':'❌'
 };
@@ -73,6 +79,20 @@ export default function Home(){
   }
   async function logout(){await fetch('/api/admin-auth',{method:'DELETE'});setAdmin(a=>({...a,authenticated:false}));setMessage('ログアウトしました。');}
   const toggle=(setter)=>(v)=>setter(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;});
+
+  async function shareStores(storeIds,label){
+    const ids=STORE_IDS.filter(id=>storeIds.includes(id));
+    const url=new URL(window.location.href);url.searchParams.set('stores',ids.join(','));
+    const shareData={title:`徳島 ベビー用品チラシチェッカー - ${label}`,text:`${label}のベビー用品情報`,url:url.toString()};
+    try{
+      if(navigator.share){await navigator.share(shareData);return;}
+      await navigator.clipboard.writeText(shareData.url);setMessage(`${label}の共有URLをコピーしました。`);
+    }catch(e){
+      if(e?.name==='AbortError')return;
+      try{await navigator.clipboard.writeText(shareData.url);setMessage(`${label}の共有URLをコピーしました。`);}
+      catch{window.prompt('この共有URLをコピーしてください',shareData.url);}
+    }
+  }
 
   async function deleteAllDatabaseData(){
     if(loading||deletingDatabase)return;
@@ -174,7 +194,7 @@ export default function Home(){
     }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{updateLockRef.current=false;setLoading(false);setUpdatingStore(null);setSelectedUpdateStore('');setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
   }
 
-  useEffect(()=>{Promise.all([load(),checkAuth()]).catch(e=>setMessage(e.message));},[]);
+  useEffect(()=>{const sharedStores=sharedVisibleStoresFromUrl();if(sharedStores)setVisibleStores(sharedStores);Promise.all([load(),checkAuth()]).catch(e=>setMessage(e.message));},[]);
   const availableStoreIds=useMemo(()=>STORE_IDS.filter(id=>(data.results||[]).some(r=>r.id===id)),[data]);
   const searchTerms=useMemo(()=>normalizeSearchText(searchQuery).split(/\s+/).filter(Boolean),[searchQuery]);
   const filteringProducts=searchTerms.length>0||knownEndOnly;
@@ -184,7 +204,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><span className="versionBadge">ver 3.3.20</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.3.22</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="databaseDeleteButton" type="button" onClick={deleteAllDatabaseData} disabled={loading||deletingDatabase}>{deletingDatabase?'削除中…':'DBデータ一括削除'}</button><button className="logoutButton" onClick={logout} disabled={deletingDatabase}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading||deletingDatabase}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||deletingDatabase||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
     </header>
 
@@ -212,7 +232,7 @@ export default function Home(){
     <section className="storeList">{visibleResults.map(store=>{
       const allItems=displayItemsForStore(store,visibleCategories,searchTerms,knownEndOnly);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
       return <article className={`store store-${store.id}`} key={store.id}>
-        <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><span className="area">{store.area}</span><span className="storeUpdated">更新日 {fmtStoreUpdate(store.checkedAt)}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
+        <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><button className="shareButton storeShareButton" type="button" onClick={()=>shareStores([store.id],STORE_NAMES[store.id]||store.chain)}>共有</button><span className="area">{store.area}</span><span className="storeUpdated">更新日 {fmtStoreUpdate(store.checkedAt)}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
           <div className="sourceLinks">{isAutomatic&&store.sourceUrls?.length?groupedSourceLinks(store.sourceUrls).map(src=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元（{src.label}）</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}</div>
         </div>
         {isAutomatic?<><div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}</div>{store.error&&<p className="error">❌ 取得エラー: {store.error}</p>}{(store.warnings||[]).length>0&&<p className="warning storeWarning">⚠️ {store.warnings.slice(0,3).join(' / ')}</p>}</>:admin.authenticated&&<details className="manualFormBox"><summary>＋ この店舗に商品を追加</summary><form className="manualForm" onSubmit={e=>addManualItem(e,store.id)}><label>商品名 <b>必須</b><input name="product" required maxLength="120"/></label><label>商品画像ファイル<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"/><small>URLを使う場合は選択しません</small></label><label className="manualWide">商品画像URL<input name="imageUrl" type="url" inputMode="url" maxLength="2000" placeholder="https://example.com/image.jpg"/><small>登録時に画像をダウンロードして保存します</small></label><label>価格 <b>必須</b><input name="price" required maxLength="40" placeholder="例：1,280円"/></label><label>広告終了日<input name="endDate" type="date"/></label><label>カテゴリ <b>必須</b><select name="category" required defaultValue=""><option value="" disabled>選択してください</option>{CATEGORY_ORDER.map(x=><option key={x} value={x}>{x}</option>)}</select></label><label>情報元 <b>必須</b><select name="sourceType" required defaultValue=""><option value="" disabled>選択してください</option><option value="チラシ">チラシ</option><option value="アプリ">アプリ</option><option value="その他">その他</option></select></label><button type="submit" disabled={savingStore===store.id}>{savingStore===store.id?'画像取得・登録中…':'商品を登録'}</button></form></details>}
