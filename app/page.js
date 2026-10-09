@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { upload } from '@vercel/blob/client';
 
 const CATEGORY_ORDER=['おむつ・おしりふき','粉ミルク・液体ミルク','離乳食・ベビーフード','おもちゃ','ベビーケア・その他','ウェア','その他'];
 const CATEGORY_META={
@@ -122,13 +121,25 @@ export default function Home(){
   }
   function updateFlyerItem(index,key,value){setFlyerItems(items=>items.map((item,i)=>i===index?{...item,[key]:value}:item));}
   function addFlyerRow(){setFlyerItems(items=>[...items,{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);}
+  async function uploadFlyerFile(file,storeId){
+    const tokenResponse=await fetch('/api/flyer-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId,filename:file.name,contentType:file.type,size:file.size})});
+    const tokenJson=await tokenResponse.json().catch(()=>({}));
+    if(!tokenResponse.ok){if(tokenResponse.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(tokenJson.error||'アップロードの準備に失敗しました');}
+    return await new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();xhr.open('PUT',tokenJson.uploadUrl);xhr.setRequestHeader('x-vercel-blob-access','private');xhr.setRequestHeader('x-content-type',file.type);
+      xhr.upload.onprogress=event=>{if(event.lengthComputable)setFlyerUploadPercent(Math.round(event.loaded/event.total*100));};
+      xhr.onerror=()=>reject(new Error('チラシファイルをVercel Blobへ送信できませんでした'));
+      xhr.onload=()=>{let result={};try{result=JSON.parse(xhr.responseText||'{}');}catch{}if(xhr.status>=200&&xhr.status<300&&result.url){setFlyerUploadPercent(100);resolve(result);}else reject(new Error(result.error?.message||result.error||`Vercel Blobへの保存に失敗しました（HTTP ${xhr.status}）`));};
+      xhr.send(file);
+    });
+  }
   async function extractUploadedFlyer(event){
     event.preventDefault();if(flyerReading||!flyerStoreId||!flyerFile)return;
     if(flyerFile.size>25*1024*1024){setMessage('チラシファイルは25MB以下にしてください。');return;}
     setFlyerReading(true);setMessage('チラシをアップロードしています…');
     try{
       let blob=flyerBlob;
-      if(!blob){const filename=flyerFile.name.replace(/[^a-zA-Z0-9._-]/g,'-').slice(-100)||'flyer';blob=await upload(`manual/${flyerStoreId}/${Date.now()}-${filename}`,flyerFile,{access:'private',handleUploadUrl:'/api/flyer-upload',clientPayload:JSON.stringify({storeId:flyerStoreId}),multipart:true,onUploadProgress:event=>setFlyerUploadPercent(Math.round(event.percentage||0))});setFlyerBlob(blob);}
+      if(!blob){blob=await uploadFlyerFile(flyerFile,flyerStoreId);setFlyerBlob(blob);}
       setMessage('アップロード完了。商品名と価格を読み取っています…');
       const res=await fetch('/api/flyer-extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:flyerStoreId,blobUrl:blob.url,contentType:flyerFile.type})});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'チラシを読み取れませんでした');}
       const extracted=json.items||[];setFlyerBlob({url:json.blobUrl||blob.url,contentType:json.contentType||flyerFile.type});setFlyerItems(extracted.length?extracted:[{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);const pageNote=json.totalPages>1?`（${json.pageCount}/${json.totalPages}ページ解析${json.truncated?'・最大10ページまで':''}）`:'';setMessage(extracted.length?`${STORE_NAMES[flyerStoreId]}：${extracted.length}件の候補を抽出しました${pageNote}。内容を確認・修正してください。`:`自動判定できなかったため空の入力行を用意しました${pageNote}。画像を見ながら入力してください。`);
@@ -224,7 +235,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.1</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.2</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="logoutButton" onClick={logout}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
     </header>
 
