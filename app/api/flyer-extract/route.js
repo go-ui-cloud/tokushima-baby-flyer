@@ -36,7 +36,7 @@ export async function POST(req){
     if(!CONTENT_TYPES.has(contentType))return NextResponse.json({error:'PDF・JPEG・PNG・WebPを選択してください'},{status:400});
     const buffer=await readLimited(result.stream??result.body);
     const detail=await ocrUploadedDocument(buffer,contentType);const items=extractFlyerItems(detail);
-    return NextResponse.json({ok:true,storeId,storeName:store.exactStoreName,blobUrl,contentType,items,pageCount:detail.pageCount||1,totalPages:detail.totalPages||detail.pageCount||1,truncated:Boolean(detail.truncated),recognizedLines:(detail.lines||[]).length,notice:items.length?'抽出結果を確認し、必要に応じて修正してください。':'商品を自動判定できませんでした。行を追加して登録できます。'},{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({ok:true,storeId,storeName:store.exactStoreName,blobUrl,contentType,items,pageCount:detail.pageCount||1,totalPages:detail.totalPages||detail.pageCount||1,truncated:Boolean(detail.truncated),recognizedLines:(detail.lines||[]).length,warningCount:(detail.warnings||[]).length,notice:items.length?'抽出結果を確認し、必要に応じて修正してください。':'商品を自動判定できませんでした。行を追加して登録できます。'},{headers:{'Cache-Control':'no-store'}});
   }catch(error){
     console.error('flyer-extract failed',error);
     return NextResponse.json({error:`チラシの読み取りに失敗しました: ${error?.message||String(error)}`},{status:500});
