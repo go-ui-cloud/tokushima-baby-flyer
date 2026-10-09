@@ -17,7 +17,7 @@ const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-onli
 const MANUAL_STORE_IDS=STORE_IDS.filter(id=>!AUTOMATIC_STORE_IDS.has(id));
 const DEFAULT_VISIBLE_STORE_IDS=['kids-public','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
 const STORE_NAMES={
-  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','kids-public':'キッズパブリック','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンライン','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
+  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','kids-public':'キッズリパブリック','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンライン','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
 };
 const STORE_ICONS={
   'birthday-aizumi':'🎈','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','kids-public':'🧒','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶','nishimatsuya-online':'🛒'
@@ -235,7 +235,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.3</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.4</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="logoutButton" onClick={logout}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
     </header>
 
@@ -263,6 +263,7 @@ export default function Home(){
         <div className="flyerReviewHead"><strong>抽出結果（{flyerItems.filter(item=>item.selected).length}/{flyerItems.length}件を登録対象）</strong><button type="button" onClick={addFlyerRow}>＋ 行を追加</button></div>
         <div className="flyerReviewRows">{flyerItems.map((item,index)=><div className={`flyerReviewRow ${item.selected?'selected':''}`} key={index}>
           <label className="flyerCheck"><input type="checkbox" checked={item.selected} onChange={e=>updateFlyerItem(index,'selected',e.target.checked)}/><span>登録</span></label>
+          <div className="flyerCandidateCrop">{item.cropPreview?<><img src={item.cropPreview} alt={item.cropAlt||`候補${index+1}のチラシ切り抜き`}/><small>元チラシの該当部分</small></>:<span>切り抜きなし</span>}</div>
           <label>商品名 <b>必須</b><input value={item.product} maxLength="120" onChange={e=>updateFlyerItem(index,'product',e.target.value)}/></label>
           <label>価格 <b>必須</b><input value={item.price} maxLength="40" onChange={e=>updateFlyerItem(index,'price',e.target.value)}/></label>
           <label>広告終了日<input type="date" value={item.endDate||''} onChange={e=>updateFlyerItem(index,'endDate',e.target.value)}/></label>
