@@ -23,6 +23,10 @@ const nextConfig = {
       './node_modules/@napi-rs/canvas-linux-x64-gnu/**',
       './node_modules/@napi-rs/canvas-linux-x64-musl/**',
     ],
+    '/api/flyer-extract': [
+      './node_modules/tesseract.js/**',
+      './node_modules/tesseract.js-core/**',
+    ],
   },
 };
 

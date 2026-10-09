@@ -45,7 +45,7 @@ export async function DELETE(req){
     const {id}=await req.json();
     if(!/^\d+$/.test(String(id||'')))return NextResponse.json({error:'正しいidが必要です'},{status:400});
     const deleted=await deleteManualItem(String(id));
-    if(deleted?.image_blob_url)await deleteManualImage(deleted.image_blob_url).catch(()=>{});
+    if(deleted?.image_blob_url&&deleted.delete_blob)await deleteManualImage(deleted.image_blob_url).catch(()=>{});
     return NextResponse.json({ok:true},{headers:{'Cache-Control':'no-store'}});
   }catch(e){return NextResponse.json({error:e.message},{status:500});}
 }

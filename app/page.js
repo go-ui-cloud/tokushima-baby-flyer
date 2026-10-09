@@ -12,14 +12,15 @@ const CATEGORY_META={
   'ウェア':{icon:'👕',short:'ウェア'},
   'その他':{icon:'📦',short:'その他'}
 };
-const STORE_IDS=['birthday-aizumi','direx','doramori','cosmos','lady','aoki','donki','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
+const STORE_IDS=['birthday-aizumi','direx','doramori','cosmos','lady','aoki','donki','kids-public','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
 const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-online','nishimatsuya-online']);
-const DEFAULT_VISIBLE_STORE_IDS=['costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
+const MANUAL_STORE_IDS=STORE_IDS.filter(id=>!AUTOMATIC_STORE_IDS.has(id));
+const DEFAULT_VISIBLE_STORE_IDS=['kids-public','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
 const STORE_NAMES={
-  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンライン','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
+  'birthday-aizumi':'バースデイ 藍住店','direx':'ダイレックス 田宮店','doramori':'ドラッグストアモリ 徳島住吉店','cosmos':'ドラッグコスモス 住吉店','lady':'レデイ薬局 田宮街道店','aoki':'クスリのアオキ 北島田店','donki':'MEGAドン・キホーテ徳島店','kids-public':'キッズパブリック','costco-online':'コストコオンライン','uniqlo-online':'UNIQLO オンライン','akachan-online':'アカチャンホンポ オンライン','nishimatsuya-online':'西松屋 オンライン'
 };
 const STORE_ICONS={
-  'birthday-aizumi':'🎈','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶','nishimatsuya-online':'🛒'
+  'birthday-aizumi':'🎈','direx':'🏷️','doramori':'💊','cosmos':'🌼','lady':'💗','aoki':'🟦','donki':'🐧','kids-public':'🧒','costco-online':'📦','uniqlo-online':'👕','akachan-online':'👶','nishimatsuya-online':'🛒'
 };
 function sharedVisibleStoresFromUrl(){
   if(typeof window==='undefined')return null;
@@ -69,6 +70,8 @@ export default function Home(){
   const [selectedUpdateStore,setSelectedUpdateStore]=useState('');
   const [searchInput,setSearchInput]=useState('');const [searchQuery,setSearchQuery]=useState('');const [knownEndOnly,setKnownEndOnly]=useState(false);
   const [expandedItemStores,setExpandedItemStores]=useState(()=>new Set());
+  const [flyerStoreId,setFlyerStoreId]=useState('');const [flyerFile,setFlyerFile]=useState(null);const [flyerPreview,setFlyerPreview]=useState('');
+  const [flyerItems,setFlyerItems]=useState([]);const [flyerReading,setFlyerReading]=useState(false);const [flyerSaving,setFlyerSaving]=useState(false);
   const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
@@ -109,6 +112,25 @@ export default function Home(){
     if(!window.confirm(`「${item.product}」を削除しますか？`))return;
     setDeletingId(item.id);
     try{const res=await fetch('/api/manual-items',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id})});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'削除に失敗しました');}await load();setMessage(`「${item.product}」を削除しました。`);}catch(e){setMessage(`削除エラー: ${e.message}`);}finally{setDeletingId(null);}
+  }
+
+  function chooseFlyerFile(file){
+    if(flyerPreview)URL.revokeObjectURL(flyerPreview);
+    setFlyerFile(file||null);setFlyerPreview(file?URL.createObjectURL(file):'');setFlyerItems([]);
+  }
+  function updateFlyerItem(index,key,value){setFlyerItems(items=>items.map((item,i)=>i===index?{...item,[key]:value}:item));}
+  function addFlyerRow(){setFlyerItems(items=>[...items,{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);}
+  async function extractUploadedFlyer(event){
+    event.preventDefault();if(flyerReading||!flyerStoreId||!flyerFile)return;
+    const body=new FormData();body.set('storeId',flyerStoreId);body.set('image',flyerFile);setFlyerReading(true);setMessage('チラシ画像を読み取り、商品候補を探しています…');
+    try{const res=await fetch('/api/flyer-extract',{method:'POST',body});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'チラシを読み取れませんでした');}const extracted=json.items||[];setFlyerItems(extracted.length?extracted:[{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);setMessage(extracted.length?`${STORE_NAMES[flyerStoreId]}：${extracted.length}件の候補を抽出しました。内容を確認・修正してください。`:'自動判定できなかったため空の入力行を用意しました。画像を見ながら入力してください。');}catch(e){setMessage(`チラシ読取エラー: ${e.message}`);}finally{setFlyerReading(false);}
+  }
+  async function registerFlyerItems(){
+    const selected=flyerItems.filter(item=>item.selected);if(!selected.length){setMessage('登録する商品にチェックを入れてください。');return;}
+    if(selected.some(item=>!item.product.trim()||!item.price.trim()||!item.category)){setMessage('選択した商品の商品名・価格・カテゴリを入力してください。');return;}
+    if(!window.confirm(`${STORE_NAMES[flyerStoreId]}へ${selected.length}件を登録しますか？`))return;
+    const body=new FormData();body.set('storeId',flyerStoreId);body.set('image',flyerFile);body.set('items',JSON.stringify(selected.map(({product,price,endDate,category})=>({product,price,endDate,category}))));setFlyerSaving(true);setMessage(`${selected.length}件を一括登録しています…`);
+    try{const res=await fetch('/api/flyer-items',{method:'POST',body});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'一括登録に失敗しました');}await load();setVisibleStores(prev=>new Set([...prev,flyerStoreId]));setFlyerItems([]);setFlyerFile(null);if(flyerPreview)URL.revokeObjectURL(flyerPreview);setFlyerPreview('');setMessage(`${STORE_NAMES[flyerStoreId]}へ${json.count}件を登録しました。`);}catch(e){setMessage(`一括登録エラー: ${e.message}`);}finally{setFlyerSaving(false);}
   }
 
   async function skipCurrent(){
@@ -192,7 +214,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.3.26</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.0</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="logoutButton" onClick={logout}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
     </header>
 
@@ -207,6 +229,28 @@ export default function Home(){
       <div className="productSearchControls"><input id="product-search" type="search" value={searchInput} onChange={event=>setSearchInput(event.target.value)} placeholder="例：パンパース、ボディスーツ" maxLength="80"/><button type="submit">検索</button>{searchQuery&&<button type="button" className="searchClearButton" onClick={()=>{setSearchInput('');setSearchQuery('');}}>検索解除</button>}<button type="button" className={`endDateFilterButton ${knownEndOnly?'on':''}`} aria-pressed={knownEndOnly} onClick={()=>setKnownEndOnly(value=>!value)}>{knownEndOnly?'✓ 終了日ありのみ':'終了日ありのみ'}</button></div>
       <small>{filteringProducts?`${searchQuery?`「${searchQuery}」・`:''}${knownEndOnly?'終了日あり・':''}検索結果：${searchResultCount}件`:'商品名の一部を入力して検索できます。ログインは不要です。'}</small>
     </form>
+
+    {admin.authenticated&&<section className="flyerUploadPanel">
+      <div className="flyerUploadHead"><div><strong>📷 チラシ画像から商品を追加</strong><p>店舗と画像を選ぶと、商品名・価格・終了日の候補を読み取ります。登録前に必ず内容を確認できます。</p></div></div>
+      <form className="flyerUploadForm" onSubmit={extractUploadedFlyer}>
+        <label>登録先店舗 <b>必須</b><select value={flyerStoreId} onChange={e=>{setFlyerStoreId(e.target.value);setFlyerItems([]);}} required><option value="">店舗を選択</option>{MANUAL_STORE_IDS.map(id=><option key={id} value={id}>{STORE_NAMES[id]}</option>)}</select></label>
+        <label>チラシ画像 <b>必須</b><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>chooseFlyerFile(e.target.files?.[0])} required/><small>JPEG・PNG・WebP、4MB以下、1枚まで</small></label>
+        <button type="submit" disabled={flyerReading||!flyerStoreId||!flyerFile}>{flyerReading?'読み取り中…':'画像から商品を抽出'}</button>
+      </form>
+      {flyerPreview&&<div className="flyerPreview"><img src={flyerPreview} alt="選択したチラシの確認"/></div>}
+      {flyerItems.length>0&&<div className="flyerReview">
+        <div className="flyerReviewHead"><strong>抽出結果（{flyerItems.filter(item=>item.selected).length}/{flyerItems.length}件を登録対象）</strong><button type="button" onClick={addFlyerRow}>＋ 行を追加</button></div>
+        <div className="flyerReviewRows">{flyerItems.map((item,index)=><div className={`flyerReviewRow ${item.selected?'selected':''}`} key={index}>
+          <label className="flyerCheck"><input type="checkbox" checked={item.selected} onChange={e=>updateFlyerItem(index,'selected',e.target.checked)}/><span>登録</span></label>
+          <label>商品名 <b>必須</b><input value={item.product} maxLength="120" onChange={e=>updateFlyerItem(index,'product',e.target.value)}/></label>
+          <label>価格 <b>必須</b><input value={item.price} maxLength="40" onChange={e=>updateFlyerItem(index,'price',e.target.value)}/></label>
+          <label>広告終了日<input type="date" value={item.endDate||''} onChange={e=>updateFlyerItem(index,'endDate',e.target.value)}/></label>
+          <label>カテゴリ <b>必須</b><select value={item.category} onChange={e=>updateFlyerItem(index,'category',e.target.value)}>{CATEGORY_ORDER.map(category=><option key={category} value={category}>{category}</option>)}</select></label>
+          <button className="flyerRemoveRow" type="button" onClick={()=>setFlyerItems(items=>items.filter((_,i)=>i!==index))}>行を削除</button>
+        </div>)}</div>
+        <button className="flyerBulkSave" type="button" disabled={flyerSaving||!flyerItems.some(item=>item.selected)} onClick={registerFlyerItems}>{flyerSaving?'一括登録中…':`選択した${flyerItems.filter(item=>item.selected).length}件を一括登録`}</button>
+      </div>}
+    </section>}
 
     {message&&<p className="notice">ℹ️ {message}</p>}
     {!admin.loading&&!admin.authenticated&&<section className="adminLogin"><div><strong>🔐 管理者ログイン</strong><p>商品を見るだけならログインは不要です。商品の登録・削除やオンライン情報の更新を行うときだけログインしてください。</p></div>{admin.configured?<form onSubmit={login}><input name="password" type="password" required autoComplete="current-password" placeholder="管理者パスワード"/><button disabled={loggingIn}>{loggingIn?'確認中…':'ログイン'}</button></form>:<p className="authError">Vercelに ADMIN_PASSWORD と ADMIN_SESSION_SECRET を設定してください。</p>}</section>}
