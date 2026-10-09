@@ -26,6 +26,11 @@ const nextConfig = {
     '/api/flyer-extract': [
       './node_modules/tesseract.js/**',
       './node_modules/tesseract.js-core/**',
+      './node_modules/pdfjs-dist/legacy/build/**',
+      './node_modules/pdfjs-dist/standard_fonts/**',
+      './node_modules/@napi-rs/canvas/**',
+      './node_modules/@napi-rs/canvas-linux-x64-gnu/**',
+      './node_modules/@napi-rs/canvas-linux-x64-musl/**',
     ],
   },
 };

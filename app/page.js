@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { upload } from '@vercel/blob/client';
 
 const CATEGORY_ORDER=['おむつ・おしりふき','粉ミルク・液体ミルク','離乳食・ベビーフード','おもちゃ','ベビーケア・その他','ウェア','その他'];
 const CATEGORY_META={
@@ -72,6 +73,7 @@ export default function Home(){
   const [expandedItemStores,setExpandedItemStores]=useState(()=>new Set());
   const [flyerStoreId,setFlyerStoreId]=useState('');const [flyerFile,setFlyerFile]=useState(null);const [flyerPreview,setFlyerPreview]=useState('');
   const [flyerItems,setFlyerItems]=useState([]);const [flyerReading,setFlyerReading]=useState(false);const [flyerSaving,setFlyerSaving]=useState(false);
+  const [flyerBlob,setFlyerBlob]=useState(null);const [flyerUploadPercent,setFlyerUploadPercent]=useState(0);
   const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
@@ -116,21 +118,29 @@ export default function Home(){
 
   function chooseFlyerFile(file){
     if(flyerPreview)URL.revokeObjectURL(flyerPreview);
-    setFlyerFile(file||null);setFlyerPreview(file?URL.createObjectURL(file):'');setFlyerItems([]);
+    setFlyerFile(file||null);setFlyerPreview(file?URL.createObjectURL(file):'');setFlyerItems([]);setFlyerBlob(null);setFlyerUploadPercent(0);
   }
   function updateFlyerItem(index,key,value){setFlyerItems(items=>items.map((item,i)=>i===index?{...item,[key]:value}:item));}
   function addFlyerRow(){setFlyerItems(items=>[...items,{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);}
   async function extractUploadedFlyer(event){
     event.preventDefault();if(flyerReading||!flyerStoreId||!flyerFile)return;
-    const body=new FormData();body.set('storeId',flyerStoreId);body.set('image',flyerFile);setFlyerReading(true);setMessage('チラシ画像を読み取り、商品候補を探しています…');
-    try{const res=await fetch('/api/flyer-extract',{method:'POST',body});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'チラシを読み取れませんでした');}const extracted=json.items||[];setFlyerItems(extracted.length?extracted:[{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);setMessage(extracted.length?`${STORE_NAMES[flyerStoreId]}：${extracted.length}件の候補を抽出しました。内容を確認・修正してください。`:'自動判定できなかったため空の入力行を用意しました。画像を見ながら入力してください。');}catch(e){setMessage(`チラシ読取エラー: ${e.message}`);}finally{setFlyerReading(false);}
+    if(flyerFile.size>25*1024*1024){setMessage('チラシファイルは25MB以下にしてください。');return;}
+    setFlyerReading(true);setMessage('チラシをアップロードしています…');
+    try{
+      let blob=flyerBlob;
+      if(!blob){const filename=flyerFile.name.replace(/[^a-zA-Z0-9._-]/g,'-').slice(-100)||'flyer';blob=await upload(`manual/${flyerStoreId}/${Date.now()}-${filename}`,flyerFile,{access:'private',handleUploadUrl:'/api/flyer-upload',clientPayload:JSON.stringify({storeId:flyerStoreId}),multipart:true,onUploadProgress:event=>setFlyerUploadPercent(Math.round(event.percentage||0))});setFlyerBlob(blob);}
+      setMessage('アップロード完了。商品名と価格を読み取っています…');
+      const res=await fetch('/api/flyer-extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:flyerStoreId,blobUrl:blob.url,contentType:flyerFile.type})});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'チラシを読み取れませんでした');}
+      const extracted=json.items||[];setFlyerBlob({url:json.blobUrl||blob.url,contentType:json.contentType||flyerFile.type});setFlyerItems(extracted.length?extracted:[{selected:true,product:'',price:'',endDate:'',category:'その他',sourceType:'チラシ'}]);const pageNote=json.totalPages>1?`（${json.pageCount}/${json.totalPages}ページ解析${json.truncated?'・最大10ページまで':''}）`:'';setMessage(extracted.length?`${STORE_NAMES[flyerStoreId]}：${extracted.length}件の候補を抽出しました${pageNote}。内容を確認・修正してください。`:`自動判定できなかったため空の入力行を用意しました${pageNote}。画像を見ながら入力してください。`);
+    }catch(e){setMessage(`チラシ読取エラー: ${e.message}`);}finally{setFlyerReading(false);}
   }
   async function registerFlyerItems(){
     const selected=flyerItems.filter(item=>item.selected);if(!selected.length){setMessage('登録する商品にチェックを入れてください。');return;}
     if(selected.some(item=>!item.product.trim()||!item.price.trim()||!item.category)){setMessage('選択した商品の商品名・価格・カテゴリを入力してください。');return;}
     if(!window.confirm(`${STORE_NAMES[flyerStoreId]}へ${selected.length}件を登録しますか？`))return;
-    const body=new FormData();body.set('storeId',flyerStoreId);body.set('image',flyerFile);body.set('items',JSON.stringify(selected.map(({product,price,endDate,category})=>({product,price,endDate,category}))));setFlyerSaving(true);setMessage(`${selected.length}件を一括登録しています…`);
-    try{const res=await fetch('/api/flyer-items',{method:'POST',body});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'一括登録に失敗しました');}await load();setVisibleStores(prev=>new Set([...prev,flyerStoreId]));setFlyerItems([]);setFlyerFile(null);if(flyerPreview)URL.revokeObjectURL(flyerPreview);setFlyerPreview('');setMessage(`${STORE_NAMES[flyerStoreId]}へ${json.count}件を登録しました。`);}catch(e){setMessage(`一括登録エラー: ${e.message}`);}finally{setFlyerSaving(false);}
+    if(!flyerBlob?.url){setMessage('先にチラシを読み取ってください。');return;}
+    const body={storeId:flyerStoreId,blobUrl:flyerBlob.url,contentType:flyerBlob.contentType||flyerFile?.type||'',items:selected.map(({product,price,endDate,category})=>({product,price,endDate,category}))};setFlyerSaving(true);setMessage(`${selected.length}件を一括登録しています…`);
+    try{const res=await fetch('/api/flyer-items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const json=await res.json();if(!res.ok){if(res.status===401)setAdmin(a=>({...a,authenticated:false}));throw new Error(json.error||'一括登録に失敗しました');}await load();setVisibleStores(prev=>new Set([...prev,flyerStoreId]));setFlyerItems([]);setFlyerFile(null);setFlyerBlob(null);setFlyerUploadPercent(0);if(flyerPreview)URL.revokeObjectURL(flyerPreview);setFlyerPreview('');setMessage(`${STORE_NAMES[flyerStoreId]}へ${json.count}件を登録しました。`);}catch(e){setMessage(`一括登録エラー: ${e.message}`);}finally{setFlyerSaving(false);}
   }
 
   async function skipCurrent(){
@@ -214,7 +224,7 @@ export default function Home(){
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.0</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.1</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
       <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="logoutButton" onClick={logout}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
     </header>
 
@@ -231,13 +241,13 @@ export default function Home(){
     </form>
 
     {admin.authenticated&&<section className="flyerUploadPanel">
-      <div className="flyerUploadHead"><div><strong>📷 チラシ画像から商品を追加</strong><p>店舗と画像を選ぶと、商品名・価格・終了日の候補を読み取ります。登録前に必ず内容を確認できます。</p></div></div>
+      <div className="flyerUploadHead"><div><strong>📷 チラシ画像・PDFから商品を追加</strong><p>店舗とファイルを選ぶと、商品名・価格・終了日の候補を読み取ります。登録前に必ず内容を確認できます。</p></div></div>
       <form className="flyerUploadForm" onSubmit={extractUploadedFlyer}>
         <label>登録先店舗 <b>必須</b><select value={flyerStoreId} onChange={e=>{setFlyerStoreId(e.target.value);setFlyerItems([]);}} required><option value="">店舗を選択</option>{MANUAL_STORE_IDS.map(id=><option key={id} value={id}>{STORE_NAMES[id]}</option>)}</select></label>
-        <label>チラシ画像 <b>必須</b><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>chooseFlyerFile(e.target.files?.[0])} required/><small>JPEG・PNG・WebP、4MB以下、1枚まで</small></label>
-        <button type="submit" disabled={flyerReading||!flyerStoreId||!flyerFile}>{flyerReading?'読み取り中…':'画像から商品を抽出'}</button>
+        <label>チラシ画像・PDF <b>必須</b><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e=>chooseFlyerFile(e.target.files?.[0])} required/><small>PDF・JPEG・PNG・WebP、25MB以下、1ファイルまで（PDFは最大10ページ）</small></label>
+        <button type="submit" disabled={flyerReading||!flyerStoreId||!flyerFile}>{flyerReading?(flyerUploadPercent<100?`アップロード中 ${flyerUploadPercent}%`:'読み取り中…'):'ファイルから商品を抽出'}</button>
       </form>
-      {flyerPreview&&<div className="flyerPreview"><img src={flyerPreview} alt="選択したチラシの確認"/></div>}
+      {flyerPreview&&<div className="flyerPreview">{flyerFile?.type==='application/pdf'?<embed src={flyerPreview} type="application/pdf" aria-label="選択したPDFチラシの確認"/>:<img src={flyerPreview} alt="選択したチラシの確認"/>}</div>}
       {flyerItems.length>0&&<div className="flyerReview">
         <div className="flyerReviewHead"><strong>抽出結果（{flyerItems.filter(item=>item.selected).length}/{flyerItems.length}件を登録対象）</strong><button type="button" onClick={addFlyerRow}>＋ 行を追加</button></div>
         <div className="flyerReviewRows">{flyerItems.map((item,index)=><div className={`flyerReviewRow ${item.selected?'selected':''}`} key={index}>
