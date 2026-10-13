@@ -13,7 +13,8 @@ const CATEGORY_META={
   'その他':{icon:'📦',short:'その他'}
 };
 const STORE_IDS=['birthday-aizumi','direx','doramori','cosmos','lady','aoki','donki','kids-public','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
-const AUTOMATIC_STORE_IDS=new Set(['costco-online','uniqlo-online','akachan-online','nishimatsuya-online']);
+const ONLINE_STORE_IDS=['costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
+const AUTOMATIC_STORE_IDS=new Set(ONLINE_STORE_IDS);
 const MANUAL_STORE_IDS=STORE_IDS.filter(id=>!AUTOMATIC_STORE_IDS.has(id));
 const DEFAULT_VISIBLE_STORE_IDS=['kids-public','costco-online','uniqlo-online','akachan-online','nishimatsuya-online'];
 const STORE_NAMES={
@@ -67,13 +68,14 @@ export default function Home(){
   const [visibleCategories,setVisibleCategories]=useState(()=>new Set(CATEGORY_ORDER));
   const [visibleStores,setVisibleStores]=useState(()=>new Set(DEFAULT_VISIBLE_STORE_IDS));
   const [storeSelectorExpanded,setStoreSelectorExpanded]=useState(false);
-  const [selectedUpdateStore,setSelectedUpdateStore]=useState('');
+  const [selectedUpdateStores,setSelectedUpdateStores]=useState(()=>new Set());
+  const [storeCategoryFilters,setStoreCategoryFilters]=useState(()=>{if(typeof window==='undefined')return{};try{const saved=JSON.parse(localStorage.getItem('storeCategoryFilters')||'{}');return Object.fromEntries(Object.entries(saved).map(([id,categories])=>[id,new Set((categories||[]).filter(category=>CATEGORY_ORDER.includes(category)))]));}catch{return{};}});
   const [searchInput,setSearchInput]=useState('');const [searchQuery,setSearchQuery]=useState('');const [knownEndOnly,setKnownEndOnly]=useState(false);
   const [expandedItemStores,setExpandedItemStores]=useState(()=>new Set());
   const [flyerStoreId,setFlyerStoreId]=useState('');const [flyerFile,setFlyerFile]=useState(null);const [flyerPreview,setFlyerPreview]=useState('');
   const [flyerItems,setFlyerItems]=useState([]);const [flyerReading,setFlyerReading]=useState(false);const [flyerSaving,setFlyerSaving]=useState(false);
   const [flyerBlob,setFlyerBlob]=useState(null);const [flyerUploadPercent,setFlyerUploadPercent]=useState(0);
-  const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);
+  const currentAbortRef=useRef(null);const currentStoreRef=useRef(null);const currentBatchRef=useRef(null);const skipRequestedRef=useRef(false);const updateLockRef=useRef(false);const updateMenuRef=useRef(null);
 
   async function load(){const res=await fetch('/api/latest',{cache:'no-store'});setData(await res.json());}
   async function checkAuth(){const res=await fetch('/api/admin-auth',{cache:'no-store'});setAdmin({loading:false,...await res.json()});}
@@ -83,6 +85,12 @@ export default function Home(){
   }
   async function logout(){await fetch('/api/admin-auth',{method:'DELETE'});setAdmin(a=>({...a,authenticated:false}));setMessage('ログアウトしました。');}
   const toggle=(setter)=>(v)=>setter(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;});
+  function toggleUpdateStore(storeId){setSelectedUpdateStores(prev=>{const next=new Set(prev);next.has(storeId)?next.delete(storeId):next.add(storeId);return next;});}
+  function setAllUpdateStores(checked){setSelectedUpdateStores(checked?new Set(ONLINE_STORE_IDS):new Set());}
+  function categoriesForStore(storeId){return storeCategoryFilters[storeId]||new Set(CATEGORY_ORDER);}
+  function toggleStoreCategory(storeId,category){setStoreCategoryFilters(prev=>{const next=new Set(prev[storeId]||CATEGORY_ORDER);next.has(category)?next.delete(category):next.add(category);return {...prev,[storeId]:next};});}
+  function setAllStoreCategories(storeId,visible){setStoreCategoryFilters(prev=>({...prev,[storeId]:visible?new Set(CATEGORY_ORDER):new Set()}));}
+  function effectiveCategoriesForStore(storeId){const local=categoriesForStore(storeId);return new Set([...visibleCategories].filter(category=>local.has(category)));}
 
   async function shareStores(storeIds,label){
     const ids=STORE_IDS.filter(id=>storeIds.includes(id));
@@ -172,13 +180,16 @@ export default function Home(){
     }catch(e){setMessage(`進行状況の同期に失敗しました: ${e.message}`);return false;}
   }
 
-  async function update(storeId){
-    const updateAll=storeId==='all-online';
-    if(!updateAll&&!AUTOMATIC_STORE_IDS.has(storeId)){setMessage('更新対象が正しくありません。');return;}
+  async function update(storeSelection){
+    const requested=Array.isArray(storeSelection)?storeSelection:storeSelection==='all-online'?ONLINE_STORE_IDS:[storeSelection];
+    const ids=[...new Set(requested)].filter(id=>AUTOMATIC_STORE_IDS.has(id));
+    if(!ids.length||ids.length!==new Set(requested).size){setMessage('更新対象が正しくありません。');return;}
+    if(updateMenuRef.current)updateMenuRef.current.open=false;
+    const updateAll=ids.length===ONLINE_STORE_IDS.length;
     if(loading||updateLockRef.current){await syncProgress();return;}
     updateLockRef.current=true;
     if(await syncProgress()){updateLockRef.current=false;return;}
-    setLoading(true);setUpdatingStore(updateAll?'all-online':storeId);const ids=updateAll?[...AUTOMATIC_STORE_IDS]:[storeId];const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
+    setLoading(true);setUpdatingStore(updateAll?'all-online':ids.length>1?'multi-online':ids[0]);const batchId=globalThis.crypto?.randomUUID?.()||`${Date.now()}`;currentBatchRef.current=batchId;
     try{
       // V2.16: 前回表示を保持したまま、取得に成功した店舗だけ順次差し替える。
       let snapshot={updatedAt:data.updatedAt||null,results:[...(data.results||[])],persistence:data.persistence||{}};
@@ -222,21 +233,22 @@ export default function Home(){
       }
       const finalRes=await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'finalize',batchId,snapshot})});const finalJson=await finalRes.json();if(!finalRes.ok)throw new Error(finalJson.error||'履歴保存に失敗しました');await load();
       setMessage(`更新完了：${ids.length-failed-skipped}店舗成功 / ${skipped}店舗スキップ${skippedNames.length?`（${skippedNames.join('、')}）`:''} / ${failed}店舗失敗${failedNames.length?`（${failedNames.join('、')}）`:''}。前回表示を維持しながら更新しました。`);
-    }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{updateLockRef.current=false;setLoading(false);setUpdatingStore(null);setSelectedUpdateStore('');setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
+    }catch(e){setMessage(`更新エラー: ${e.message}`);await load().catch(()=>{});}finally{updateLockRef.current=false;setLoading(false);setUpdatingStore(null);setSelectedUpdateStores(new Set());setProgress(null);setElapsed(0);currentAbortRef.current=null;currentStoreRef.current=null;currentBatchRef.current=null;}
   }
 
   useEffect(()=>{const sharedStores=sharedVisibleStoresFromUrl();if(sharedStores)setVisibleStores(sharedStores);Promise.all([load(),checkAuth()]).catch(e=>setMessage(e.message));},[]);
+  useEffect(()=>{try{localStorage.setItem('storeCategoryFilters',JSON.stringify(Object.fromEntries(Object.entries(storeCategoryFilters).map(([id,categories])=>[id,[...categories]]))));}catch{}},[storeCategoryFilters]);
   const availableStoreIds=useMemo(()=>STORE_IDS.filter(id=>(data.results||[]).some(r=>r.id===id)),[data]);
   const searchTerms=useMemo(()=>normalizeSearchText(searchQuery).split(/\s+/).filter(Boolean),[searchQuery]);
   const filteringProducts=searchTerms.length>0||knownEndOnly;
-  const visibleResults=(data.results||[]).filter(store=>visibleStores.has(store.id)&&(!filteringProducts||displayItemsForStore(store,visibleCategories,searchTerms,knownEndOnly).length));
-  const searchResultCount=useMemo(()=>visibleResults.reduce((count,store)=>count+displayItemsForStore(store,visibleCategories,searchTerms,knownEndOnly).length,0),[visibleResults,visibleCategories,searchTerms,knownEndOnly]);
+  const visibleResults=(data.results||[]).filter(store=>visibleStores.has(store.id)&&(!filteringProducts||displayItemsForStore(store,effectiveCategoriesForStore(store.id),searchTerms,knownEndOnly).length));
+  const searchResultCount=visibleResults.reduce((count,store)=>count+displayItemsForStore(store,effectiveCategoriesForStore(store.id),searchTerms,knownEndOnly).length,0);
   const totals=useMemo(()=>{const results=data.results||[];return{stores:results.length,visibleStores:results.filter(r=>visibleStores.has(r.id)).length,items:results.reduce((n,r)=>n+displayItemsForStore(r).length,0),healthy:results.filter(r=>!r.error&&!r.skipped).length};},[data,visibleStores]);
 
   return <main>
     <header className="topbar">
-      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.4</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
-      <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="logoutButton" onClick={logout}>ログアウト</button></div><div className="actionRow"><select className="updateStoreSelect" aria-label="更新するオンライン店舗" value={selectedUpdateStore} onChange={e=>setSelectedUpdateStore(e.target.value)} disabled={loading}><option value="">更新する店舗を選択</option><option value="costco-online">コストコオンライン</option><option value="uniqlo-online">UNIQLO</option><option value="akachan-online">アカチャンホンポオンライン</option><option value="nishimatsuya-online">西松屋オンライン</option><option value="all-online">オンライン全店舗</option></select><button className="updateButton" onClick={()=>selectedUpdateStore&&update(selectedUpdateStore)} disabled={loading||!selectedUpdateStore}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):(selectedUpdateStore==='all-online'?'↻ オンライン全店舗を更新':'↻ 選択した店舗を更新')}</button></div></>}</div>
+      <div className="heroCopy"><p className="eyebrow">TOKUSHIMA BABY SALE</p><div className="mainTitleRow"><span className="heroIcon">🍼</span><h1>ベビー用品 チラシチェッカー</h1><button className="shareButton pageShareButton" type="button" onClick={()=>shareStores([...visibleStores],'現在表示している店舗')} disabled={!visibleStores.size}>共有</button><span className="versionBadge">ver 3.4.6</span></div><p className="sub">徳島の各店舗で見つけたベビー用品の安売り情報を手動で登録・一覧表示します。オンライン4店舗は公式ページから店舗を選んで更新できます。</p></div>
+      <div className="actions">{admin.authenticated&&<><div className="actionRow"><button className="logoutButton" onClick={logout}>ログアウト</button></div><div className="actionRow"><details ref={updateMenuRef} className={`updateStoreMulti ${loading?'disabled':''}`}><summary>{selectedUpdateStores.size?`${selectedUpdateStores.size}店舗を選択中`:'更新する店舗を選択'}</summary><div className="updateStoreMenu"><label><input type="checkbox" checked={selectedUpdateStores.size===ONLINE_STORE_IDS.length} onChange={e=>setAllUpdateStores(e.target.checked)} disabled={loading}/><strong>オンライン全店舗</strong></label>{ONLINE_STORE_IDS.map(id=><label key={id}><input type="checkbox" checked={selectedUpdateStores.has(id)} onChange={()=>toggleUpdateStore(id)} disabled={loading}/><span>{STORE_NAMES[id]}</span></label>)}</div></details><button className="updateButton" onClick={()=>update([...selectedUpdateStores])} disabled={loading||!selectedUpdateStores.size}>{loading?(updatingStore==='all-online'?'🔄 全店舗を更新中…':updatingStore==='multi-online'?'🔄 選択店舗を更新中…':`🔄 ${STORE_NAMES[updatingStore]||''} 更新中…`):`↻ 選択した${selectedUpdateStores.size||''}店舗を更新`}</button></div></>}</div>
     </header>
 
     <section className="summary">
@@ -283,13 +295,14 @@ export default function Home(){
 
     {filteringProducts&&searchResultCount===0&&<div className="searchEmpty"><strong>該当する商品がありません</strong><p>検索条件を変えるか、カテゴリ・店舗の表示設定を確認してください。</p></div>}
     <section className="storeList">{visibleResults.map(store=>{
-      const allItems=displayItemsForStore(store,visibleCategories,searchTerms,knownEndOnly);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
+      const storeCategories=categoriesForStore(store.id);const effectiveCategories=effectiveCategoriesForStore(store.id);const allItems=displayItemsForStore(store,effectiveCategories,searchTerms,knownEndOnly);const tone=freshnessTone(store.flyerFreshness||'');const isAutomatic=AUTOMATIC_STORE_IDS.has(store.id);const itemListExpanded=expandedItemStores.has(store.id);const items=itemListExpanded?allItems:allItems.slice(0,5);
       return <article className={`store store-${store.id}`} key={store.id}>
         <div className="storeHead"><div className="storeIdentity"><div className="storeIconBox">{STORE_ICONS[store.id]||'🏪'}</div><div><div className="titleRow"><h2>{store.chain}</h2><button className="shareButton storeShareButton" type="button" onClick={()=>shareStores([store.id],STORE_NAMES[store.id]||store.chain)}>共有</button><span className="area">{store.area}</span><span className="storeUpdated">更新日 {fmtStoreUpdate(store.checkedAt)}</span></div><p className="stores">対象: {STORE_NAMES[store.id]||`${store.chain} ${store.area}`}</p></div></div>
           <div className="sourceLinks">{isAutomatic&&store.sourceUrls?.length?groupedSourceLinks(store.sourceUrls).map(src=><a key={src.url} href={src.url} target="_blank" rel="noreferrer">🔗 情報元（{src.label}）</a>):<a href={store.sourceUrl} target="_blank" rel="noreferrer">🔗 情報元</a>}</div>
         </div>
+        <details className="storeCategoryMenu"><summary>表示カテゴリを選択（{storeCategories.size}/{CATEGORY_ORDER.length}）</summary><div className="storeCategoryControls"><div className="storeCategoryActions"><button type="button" onClick={()=>setAllStoreCategories(store.id,true)}>すべて</button><button type="button" onClick={()=>setAllStoreCategories(store.id,false)}>すべて非表示</button></div><div className="storeCategoryChecks">{CATEGORY_ORDER.map(category=><label key={category}><input type="checkbox" checked={storeCategories.has(category)} onChange={()=>toggleStoreCategory(store.id,category)}/><span>{CATEGORY_META[category]?.icon} {CATEGORY_META[category]?.short||category}</span></label>)}</div><small>上部のカテゴリ表示でもONになっている商品だけを表示します。</small></div></details>
         {isAutomatic?<><div className="storeStatusRow"><span className={`freshness ${tone}`}>📅 {store.flyerFreshness||'最新性不明'}</span>{store.durationMs!=null&&<span className="metaChip">⏱ {(store.durationMs/1000).toFixed(1)}秒</span>}</div>{store.error&&<p className="error">❌ 取得エラー: {store.error}</p>}{(store.warnings||[]).length>0&&<p className="warning storeWarning">⚠️ {store.warnings.slice(0,3).join(' / ')}</p>}</>:admin.authenticated&&<details className="manualFormBox"><summary>＋ この店舗に商品を追加</summary><form className="manualForm" onSubmit={e=>addManualItem(e,store.id)}><label>商品名 <b>必須</b><input name="product" required maxLength="120"/></label><label>商品画像ファイル<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"/><small>URLを使う場合は選択しません</small></label><label className="manualWide">商品画像URL<input name="imageUrl" type="url" inputMode="url" maxLength="2000" placeholder="https://example.com/image.jpg"/><small>登録時に画像をダウンロードして保存します</small></label><label>価格 <b>必須</b><input name="price" required maxLength="40" placeholder="例：1,280円"/></label><label>広告終了日<input name="endDate" type="date"/></label><label>カテゴリ <b>必須</b><select name="category" required defaultValue=""><option value="" disabled>選択してください</option>{CATEGORY_ORDER.map(x=><option key={x} value={x}>{x}</option>)}</select></label><label>情報元 <b>必須</b><select name="sourceType" required defaultValue=""><option value="" disabled>選択してください</option><option value="チラシ">チラシ</option><option value="アプリ">アプリ</option><option value="その他">その他</option></select></label><button type="submit" disabled={savingStore===store.id}>{savingStore===store.id?'画像取得・登録中…':'商品を登録'}</button></form></details>}
-        {!items.length?<div className="empty"><span className="emptyIcon">🗂️</span><div><strong>{isAutomatic?'表示できる商品はありません':'登録商品はまだありません'}</strong><p>{store.id==='costco-online'?'指定したコストコオンライン2ページで赤文字の「引き後」がある商品を確認できませんでした。':store.id==='uniqlo-online'?'UNIQLO公式ページで赤文字・値下げ・期間限定価格の商品を確認できませんでした。':store.id==='akachan-online'?'アカチャンホンポ公式の指定10ページで赤文字価格の商品を確認できませんでした。':admin.authenticated?'上の「この店舗に商品を追加」から安売り情報を登録してください。':'管理者ログイン後に安売り情報を登録できます。'}</p></div></div>:
+        {!items.length?<div className="empty"><span className="emptyIcon">🗂️</span><div><strong>{isAutomatic?'表示できる商品はありません':'登録商品はまだありません'}</strong><p>{(store.items||[]).length?'現在のカテゴリ・商品検索・終了日条件に該当する商品がありません。':store.id==='costco-online'?'指定したコストコオンライン2ページで赤文字の「引き後」がある商品を確認できませんでした。':store.id==='uniqlo-online'?'UNIQLO公式ページで赤文字・値下げ・期間限定価格の商品を確認できませんでした。':store.id==='akachan-online'?'アカチャンホンポ公式の指定10ページで赤文字価格の商品を確認できませんでした。':admin.authenticated?'上の「この店舗に商品を追加」から安売り情報を登録してください。':'管理者ログイン後に安売り情報を登録できます。'}</p></div></div>:
         isAutomatic?<div className="cards">{items.map((x,i)=><div className="card costcoCard" key={itemKey(x,i)}>{x.imageUrl?<a className="productImageLink" href={productPageUrl(x)} target="_blank" rel="noreferrer" aria-label={`${x.product}の商品ページを開く`}><div className="productImageWrap"><img className="costcoThumb" src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div></a>:<div className="icon">{CATEGORY_META[x.category]?.icon||'🧺'}</div>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><h3>{x.product}</h3>{x.discountAfter&&<div className="discountAfter">🔥 {x.discountAfter}</div>}<div className="price">{x.price}</div><dl><div><dt>終了日</dt><dd>{x.endDate}</dd></div></dl><a className="detailLink" href={productPageUrl(x)} target="_blank" rel="noreferrer">情報を確認 ↗</a></div>)}</div>:<div className="cards manualCards">{items.map((x,i)=><div className="card manualCard" key={x.id||itemKey(x,i)}>{x.imageUrl?<div className="manualImageWrap"><img src={x.imageUrl} alt={x.product} loading="lazy" referrerPolicy="no-referrer"/></div>:<div className="manualNoImage">画像なし</div>}<span className="cat">{CATEGORY_META[x.category]?.icon||''} {x.category}</span><span className="manualSource">情報元：{x.sourceType||'その他'}</span><h3>{x.product}</h3><div className="price">{x.price}</div><dl><div><dt>広告終了日</dt><dd>{x.endDate==='不明'?'未設定':x.endDate}</dd></div></dl>{admin.authenticated&&<button className="deleteManual" type="button" disabled={deletingId===x.id} onClick={()=>removeManualItem(x)}>{deletingId===x.id?'削除中…':'削除'}</button>}</div>)}</div>}
         {allItems.length>5&&<button className="moreItemsButton" type="button" aria-expanded={itemListExpanded} onClick={()=>setExpandedItemStores(prev=>{const next=new Set(prev);next.has(store.id)?next.delete(store.id):next.add(store.id);return next;})}>{itemListExpanded?'折りたたむ':`もっと表示（残り${allItems.length-5}件）`}</button>}
       </article>;
